@@ -8,7 +8,7 @@ package main
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func subpage() templ.Component {
+func about() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,15 +49,7 @@ func subpage() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h3>Claude Running the Sink: Variant XXXX</h3><div class=\"border\"><div class=\"center-image-text\"><img src=\"/assets/tweet.jpg\" class=\"tree-img\"><p>Here is the description of the image. It might contain some history. Perhaps there are also statistics here.</p></div><br><br>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = offspring().Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h3>About this site:</h3><p>This site is meant to allow you to view the history of memes as they develop over time. To learn more about what a meme is, see: <a href=\"https://en.wikipedia.org/wiki/Meme\">the wikipedia  page for meme</a>, or read The Selfish Gene (Dawkins 1976). </p><p>This site tracks memetic history by storing individual memes in trees. Each meme can have multiple ancestors and multiple offspring. Offspring are memes that inherit some trait from a meme that existed at an earlier point in time. These earlier memes are  ancestor memes. Individual offspring in a tree are referred to as variants. The original ancestor  in a tree, with no other ancestors, is referred to as a LUCA. LUCAs are dynamically updated as new data is added, since new ancestors will be discovered over time.</p><p>Memes can be submitted by anyone, in order to allow for the representation of much information as possible. However, all data that appears on the publicly available website has been verified as the admins of this website. Evidence of original posters will be linked to in descriptions when available through the internet archive, but this cannot be done feasibly for every meme present in the database.</p><p>This site is run by <a href=\"https://nlessard.online\">Noah Lessard</a> and <a href=\"https://salm.dev\">Nico Salm</a>. It is run for free, please donate by recommending the site to other people, submitting a meme or becoming a moderator.</p></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,5 +1,7 @@
 # Memetic Tree
 
+![homepage](homepage.png)
+
 The goal of this project is to provide very efficient image storage while also generate interesting anthropological statistics based off of submitted content. And, to have fun!
 
 ## Tech Stack:
