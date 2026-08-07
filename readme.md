@@ -9,3 +9,16 @@ The goal of this project is to provide very efficient image storage while also g
 - go to manage backend and statistics, user upload
 - a-h/templ for managing front end parts
 - podman for containerization (if needed?)
+
+## How trees are organized:
+- Each meme has ancestors and offspring.
+- Memes can have multiple ancestors and multiple offspring.
+- Individual offspring are referred to as `variants`.
+- The original ancestor in a tree, with no other ancestors, is referred to as a `LUCA`. 
+- `LUCA`s are dynamically updated as new data is added, since new ancestors will be discovered over time.
+
+## Build:
+- For Webserver:
+    - Enter webserver directory 
+    - Build templ files with: `go tool templ generate`
+    - Run with `go run .`
