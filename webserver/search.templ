@@ -1,0 +1,39 @@
+package main
+
+const layout = "2006-01-02 15:04:05"
+
+templ search(results []Node) {
+
+<!DOCTYPE html>
+<html>
+
+@style()
+
+<body>
+    <div class="center">
+    @homebutton()    
+    
+    @links()
+    
+    <form method="POST" action="/search">
+        <h3>Search for a node by name:</h3>
+        <input type="text" id="nodeinput" name="nodeinput">
+        <input type="submit" value="Submit">
+    </form>
+
+    if len(results) > 0 {
+        <h2>Results:</h2>
+        <ul>
+            for _, node := range results {
+                <li>{ node.Name }, { node.Description }, { node.CreatedAt.Format(layout) }</li>
+            }
+        </ul>
+    }
+
+</div>
+
+</body>
+
+</html>
+
+}

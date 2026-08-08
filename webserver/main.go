@@ -31,8 +31,9 @@ func main() {
 	fmt.Println("Successfully connected to SQLite database")
 
 	var myNode = Node{
-		Name:        "Claude is running the sink",
-		Description: "This image is comparing claude to running the sink, how silly.",
+		Name:        "The Home Page Tree",
+		Description: "This image is pretty sick huh.",
+		ImagePath:   "/assets/tree.jpg",
 	}
 
 	createnode(db, myNode)

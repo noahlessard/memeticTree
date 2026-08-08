@@ -6,6 +6,7 @@ type Node struct {
 	ID          string
 	Name        string
 	Description string
+	ImagePath   string
 	Parents     []Node
 	Children    []Node
 	CreatedAt   time.Time
