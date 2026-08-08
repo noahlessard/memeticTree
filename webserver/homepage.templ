@@ -1,6 +1,10 @@
 package main
 
-templ homepage() {
+import(
+    "database/sql"
+)
+
+templ homepage(db *sql.DB) {
 
 <!DOCTYPE html>
 <html>
@@ -18,6 +22,10 @@ templ homepage() {
     
     <p>
         Explore an archival history of memes and how they pass traits down onto offspring. User submitted and human moderated.
+    </p>
+
+    <p>
+        There are currently {countNodes(db) } memes in the tree. 
     </p>
 
     </div>

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strconv"
 
 	"github.com/a-h/templ"
 )
@@ -17,7 +18,7 @@ func startWebserver(db *sql.DB) {
 	http.Handle("/assets/", fs)
 
 	// serve html from templ
-	http.Handle("/", templ.Handler(homepage()))
+	http.Handle("/", templ.Handler(homepage(db)))
 
 	http.HandleFunc("/subpage", makeSubpageHandler(db))
 
@@ -34,7 +35,16 @@ func startWebserver(db *sql.DB) {
 
 func makeSubpageHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		node := getnode(db, 1) // this should be passed in the future or something
+
+		nodeIDStr := r.URL.Query().Get("id")
+		nodeID, err := strconv.Atoi(nodeIDStr)
+		if err != nil {
+			http.Error(w, "Invalid node ID", http.StatusBadRequest)
+			return
+		}
+
+		node := getnode(db, nodeID)
+
 		templ.Handler(subpage(node)).ServeHTTP(w, r)
 	}
 }

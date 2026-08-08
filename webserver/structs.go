@@ -3,7 +3,7 @@ package main
 import "time"
 
 type Node struct {
-	ID          string
+	ID          int
 	Name        string
 	Description string
 	ImagePath   string

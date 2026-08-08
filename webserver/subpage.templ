@@ -18,7 +18,7 @@ templ subpage(node Node) {
 
     <div class="border">
 
-    @offspring("Memetic Ancestors")
+    @offspring("Memetic Ancestors", node.Parents)
 
     <div class="center-image-text">
         <img src={ node.ImagePath } class="tree-img">
@@ -30,7 +30,7 @@ templ subpage(node Node) {
 
     <br><br>
 
-    @offspring("Memetic Offspring")
+    @offspring("Memetic Offspring", node.Children)
 
     </div>
 

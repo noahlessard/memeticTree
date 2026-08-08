@@ -8,6 +8,9 @@ import (
 )
 
 func initDatabase(db *sql.DB) error {
+
+	// TODO: I'm not sure if these not nulls are actually enforced
+	// with how go defaults things. Double check eventually
 	const schema = `
 	CREATE TABLE IF NOT EXISTS nodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +27,8 @@ func initDatabase(db *sql.DB) error {
 
 }
 
-func createnode(db *sql.DB, node Node) {
+func createnode(db *sql.DB, node Node) int {
+
 	query := `
         INSERT INTO nodes (name, description, imagepath, parents, children, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -34,7 +38,7 @@ func createnode(db *sql.DB, node Node) {
 	parentsJSON, _ := json.Marshal(node.Parents)
 	childrenJSON, _ := json.Marshal(node.Children)
 
-	_, err := db.Exec(query,
+	result, err := db.Exec(query,
 		node.Name,
 		node.Description,
 		node.ImagePath,
@@ -47,6 +51,96 @@ func createnode(db *sql.DB, node Node) {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		fmt.Println("Error getting ID:", err)
+		return -1
+	}
+
+	// update node data structure before we check updating relatives
+	node.ID = int(id)
+
+	// check if we need to update parents / children
+	updateRelatives(db, node)
+
+	return int(id)
+
+}
+
+func updateRelatives(db *sql.DB, node Node) {
+
+	if len(node.Children) > 0 {
+		for _, childNode := range node.Children {
+			// update the child nodes to have this node as its parent
+			fmt.Println(childNode)
+			updateParents(db, childNode.ID, node)
+		}
+	}
+
+	if len(node.Parents) > 0 {
+
+		for _, parentNode := range node.Parents {
+			// update the parent nodes to have this node as a child
+			updateChildren(db, parentNode.ID, node)
+		}
+	}
+}
+
+func updateParents(db *sql.DB, changedNode int, newNode Node) error {
+
+	// Get the changing node, so we can make sure its not duped
+	changedNodeDB := getnode(db, changedNode)
+
+	for _, p := range changedNodeDB.Parents {
+		if p.ID == newNode.ID {
+			return nil
+		}
+	}
+
+	// Add the parent
+	changedNodeDB.Parents = append(changedNodeDB.Parents, newNode)
+
+	// Marshal back to JSON and update database
+	newJson, err := json.Marshal(changedNodeDB.Parents)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(
+		"UPDATE nodes SET parents = ? WHERE id = ?",
+		string(newJson),
+		changedNode,
+	)
+	return err
+}
+
+func updateChildren(db *sql.DB, changedNode int, newNode Node) error {
+	// Get the changing node, so we can make sure its not duped
+	changedNodeDB := getnode(db, changedNode)
+
+	// Check if child already exists to avoid duplicates
+	for _, c := range changedNodeDB.Children {
+		if c.ID == newNode.ID {
+			return nil
+		}
+	}
+
+	// Add the child
+	changedNodeDB.Children = append(changedNodeDB.Children, newNode)
+
+	// Marshal back to JSON and update database
+	childrenJSON, err := json.Marshal(changedNodeDB.Children)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(
+		"UPDATE nodes SET children = ? WHERE id = ?",
+		string(childrenJSON),
+		changedNode,
+	)
+	return err
 }
 
 func getnode(db *sql.DB, id int) Node {

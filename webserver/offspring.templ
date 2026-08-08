@@ -1,13 +1,22 @@
 package main
 
-templ offspring(text string) {
+import (
+    "fmt"
+)
+
+templ offspring(text string, offspringNodes []Node) {
+    
+    if len(offspringNodes) > 0 {
 
     <p>{ text }:</p>
 
     <div class="h2-row">
-        <h4><a href="testendpoint.com">Image A</a></h4>
-        <h4><a href="testendpoint.com">Image B</a></h4>
-        <h4><a href="testendpoint.com">Image C</a></h4>
+        for _, node := range offspringNodes {
+        <h4><a href={ "/subpage?id=" + fmt.Sprint(node.ID) }>{ node.Name }</a></h4>
+    }
     </div>
+    }
+
+
 
 }

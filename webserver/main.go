@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"os"
 
 	// the underscore import registers the driver with database/sql
 	_ "github.com/mattn/go-sqlite3"
@@ -11,6 +12,10 @@ import (
 func main() {
 
 	// open database connection (create if it does not exist)
+
+	var firstStartup error
+	_, firstStartup = os.Stat("./app.db")
+
 	db, err := sql.Open("sqlite3", "./app.db")
 	if err != nil {
 		fmt.Println("Failed to open database")
@@ -30,13 +35,9 @@ func main() {
 
 	fmt.Println("Successfully connected to SQLite database")
 
-	var myNode = Node{
-		Name:        "The Home Page Tree",
-		Description: "This image is pretty sick huh.",
-		ImagePath:   "/assets/tree.jpg",
+	if firstStartup != nil {
+		seedDB(db)
 	}
-
-	createnode(db, myNode)
 
 	startWebserver(db)
 
