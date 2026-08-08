@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
 )
@@ -64,19 +65,33 @@ func handleSearch(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var results []Node
 		var searchType string
+		var searchQuery string
 
-		// if form was submitted, search for results
-		if r.Method == "POST" {
-			searchQuery := r.FormValue("nodeinput")
-			searchType = r.FormValue("searchType")
+		searchQuery = r.FormValue("nodeinput") // POST
+		if searchQuery == "" {
+			searchQuery = r.URL.Query().Get("query") // GET fallback
+		}
+
+		searchType = r.FormValue("searchType") // POST
+		if searchType == "" {
+			searchType = r.URL.Query().Get("searchType") // GET fallback
+		}
+
+		// if search query exists, search for results
+		if searchQuery != "" {
 			if searchType == "name" {
 				results = getnodeByName(db, searchQuery)
-			} else {
-				fmt.Println("got the following tags: " + searchQuery)
+			} else if searchType == "tags" {
+				tagSplit := strings.Split(searchQuery, ",")
+				tags := make([]string, len(tagSplit))
+				for i, tag := range tagSplit {
+					tags[i] = strings.TrimSpace(tag)
+				}
+				results = getnodeByTags(db, tags)
 			}
 		}
 
 		// render the search component with or without results
-		templ.Handler(search(results, searchType)).ServeHTTP(w, r)
+		templ.Handler(search(results, searchType, searchQuery)).ServeHTTP(w, r)
 	}
 }

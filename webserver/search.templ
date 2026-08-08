@@ -2,7 +2,7 @@ package main
 
 const layout = "2006-01-02 15:04:05"
 
-templ search(results []Node, selectedType string) {
+templ search(results []Node, selectedType string, searchQuery string) {
 
 <!DOCTYPE html>
 <html>
@@ -23,7 +23,8 @@ templ search(results []Node, selectedType string) {
 				<option value="tags" selected?={ selectedType == "tags" }>Tags</option>
 			</select>
 		</div>
-		<input type="text" id="nodeinput" name="nodeinput">
+        <p>Tags must be comma separated.</p>
+		<input type="text" id="nodeinput" name="nodeinput" value= { searchQuery }>
 		<input type="submit" value="Submit">
 	</form>
 

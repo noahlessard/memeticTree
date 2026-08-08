@@ -9,6 +9,7 @@ type Node struct {
 	ImagePath   string
 	Parents     []Node
 	Children    []Node
+	Tags        []string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

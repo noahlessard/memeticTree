@@ -26,15 +26,17 @@ func seedDB(db *sql.DB) {
 		ImagePath:   "/assets/cat.png",
 		Parents:     []Node{},
 		Children:    []Node{},
+		Tags:        []string{"cat", "god"},
 	}
 	id1 := createnode(db, node1)
 
 	node2 := Node{
 		Name:        "Test Parent",
 		Description: "I should have both children and parent",
-		ImagePath:   "/assets/cool.png",
+		ImagePath:   "/assets/cool.avif",
 		Parents:     []Node{getnode(db, id1)},
 		Children:    []Node{},
+		Tags:        []string{"notext"},
 	}
 	id2 := createnode(db, node2)
 
@@ -44,6 +46,7 @@ func seedDB(db *sql.DB) {
 		ImagePath:   "/assets/tweet.jpg",
 		Parents:     []Node{getnode(db, id2), getnode(db, id1)},
 		Children:    []Node{},
+		Tags:        []string{"twitter"},
 	}
 	createnode(db, node3)
 

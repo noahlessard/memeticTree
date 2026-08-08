@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -20,7 +21,19 @@ func initDatabase(db *sql.DB) error {
     parents TEXT,
     children TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);`
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+	
+	
+	CREATE TABLE tags (
+    id INTEGER PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL);
+
+	CREATE TABLE junction_node_tags (
+    item_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (item_id, tag_id),
+    FOREIGN KEY (item_id) REFERENCES nodes(id),
+    FOREIGN KEY (tag_id) REFERENCES tags(id));`
 
 	_, err := db.Exec(schema)
 	return err
@@ -60,6 +73,14 @@ func createnode(db *sql.DB, node Node) int {
 
 	// update node data structure before we check updating relatives
 	node.ID = int(id)
+
+	// Add tags if provided
+	if len(node.Tags) > 0 {
+		err := addTagsToNode(db, node.ID, node.Tags)
+		if err != nil {
+			fmt.Println("error adding tags:", err)
+		}
+	}
 
 	// check if we need to update parents / children
 	updateRelatives(db, node)
@@ -143,65 +164,15 @@ func updateChildren(db *sql.DB, changedNode int, newNode Node) error {
 	return err
 }
 
-func getnode(db *sql.DB, id int) Node {
-	query := `
-	    SELECT id, name, description, imagepath, parents, children, created_at, updated_at
-	    FROM nodes
-	    WHERE id = ?
-	`
-
-	var node Node
-	var parentsJSON sql.NullString
-	var childrenJSON sql.NullString
-
-	err := db.QueryRow(query, id).Scan(
-		&node.ID,
-		&node.Name,
-		&node.Description,
-		&node.ImagePath,
-		&parentsJSON,
-		&childrenJSON,
-		&node.CreatedAt,
-		&node.UpdatedAt,
-	)
-
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		if parentsJSON.Valid {
-			json.Unmarshal([]byte(parentsJSON.String), &node.Parents)
-		}
-		if childrenJSON.Valid {
-			json.Unmarshal([]byte(childrenJSON.String), &node.Children)
-		}
-	}
-
-	return node
-}
-
-func getnodeByName(db *sql.DB, searchTerm string) []Node {
-	query := `
-	    SELECT id, name, description, imagepath, parents, children, created_at, updated_at
-	    FROM nodes
-	    WHERE name LIKE ?
-	`
-
-	// get all rows that possibly match query
-	// need the odd string building for the LIKE keyword
-	rows, err := db.Query(query, "%"+searchTerm+"%")
-	if err != nil {
-		fmt.Println(err)
-		return []Node{}
-	}
-
-	defer rows.Close()
+func unwrapSQLNodes(rows *sql.Rows) []Node {
 
 	// put all the results into node array
-	var nodes []Node
+	var returnNodes []Node
 	for rows.Next() {
 		var node Node
 		var parentsJSON sql.NullString
 		var childrenJSON sql.NullString
+		var tagsStr sql.NullString
 
 		err := rows.Scan(
 			&node.ID,
@@ -212,6 +183,7 @@ func getnodeByName(db *sql.DB, searchTerm string) []Node {
 			&childrenJSON,
 			&node.CreatedAt,
 			&node.UpdatedAt,
+			&tagsStr,
 		)
 
 		if err != nil {
@@ -226,10 +198,118 @@ func getnodeByName(db *sql.DB, searchTerm string) []Node {
 			json.Unmarshal([]byte(childrenJSON.String), &node.Children)
 		}
 
-		nodes = append(nodes, node)
+		// parse tags from comma-separated string
+		if tagsStr.Valid && tagsStr.String != "" {
+			node.Tags = strings.Split(tagsStr.String, ",")
+		} else {
+			node.Tags = []string{}
+		}
+
+		returnNodes = append(returnNodes, node)
 	}
 
-	return nodes
+	return returnNodes
+
+}
+
+func getnode(db *sql.DB, id int) Node {
+	query := `
+		SELECT 
+			n.id, 
+			n.name, 
+			n.description, 
+			n.imagepath, 
+			n.parents, 
+			n.children, 
+			n.created_at, 
+			n.updated_at,
+			COALESCE(GROUP_CONCAT(t.name, ','), '') as tags
+		FROM nodes n
+		LEFT JOIN junction_node_tags nt ON n.id = nt.item_id
+		LEFT JOIN tags t ON nt.tag_id = t.id
+		WHERE n.id = ?
+		GROUP BY n.id
+	`
+
+	rows, err := db.Query(query, id)
+	if err != nil {
+		fmt.Println(err)
+		return Node{}
+	}
+	defer rows.Close()
+
+	return unwrapSQLNodes(rows)[0]
+}
+
+func getnodeByName(db *sql.DB, searchTerm string) []Node {
+	query := `
+		SELECT 
+			n.id, 
+			n.name, 
+			n.description, 
+			n.imagepath, 
+			n.parents, 
+			n.children, 
+			n.created_at, 
+			n.updated_at,
+			GROUP_CONCAT(t.name, ',') as tags
+		FROM nodes n
+		LEFT JOIN junction_node_tags nt ON n.id = nt.item_id
+		LEFT JOIN tags t ON nt.tag_id = t.id
+		WHERE n.name LIKE ?
+		GROUP BY n.id
+		ORDER BY n.name
+	`
+
+	// get all rows that possibly match query
+	// need the odd string building for the LIKE keyword
+	rows, err := db.Query(query, "%"+searchTerm+"%")
+	if err != nil {
+		fmt.Println(err)
+		return []Node{}
+	}
+
+	defer rows.Close()
+
+	return unwrapSQLNodes(rows)
+}
+
+func getnodeByTags(db *sql.DB, tags []string) []Node {
+	placeholders := strings.Repeat("?,", len(tags)-1) + "?"
+
+	query := fmt.Sprintf(`
+		SELECT DISTINCT
+			i.id, 
+			i.name, 
+			i.description, 
+			i.imagepath, 
+			i.parents, 
+			i.children, 
+			i.created_at, 
+			i.updated_at,
+			COALESCE(GROUP_CONCAT(t.name, ','), '') as tags
+		FROM nodes i
+		JOIN junction_node_tags it ON i.id = it.item_id
+		JOIN tags t ON it.tag_id = t.id
+		WHERE t.name IN (%s)
+		GROUP BY i.id`, placeholders)
+
+	// Convert []string to []interface{} for db.Query
+	args := make([]interface{}, len(tags))
+	for i, tag := range tags {
+		args[i] = tag
+	}
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		fmt.Println(err)
+		return []Node{}
+	}
+
+	defer rows.Close()
+
+	return unwrapSQLNodes(rows)
+
 }
 
 func countNodes(db *sql.DB) int {
@@ -244,4 +324,50 @@ func countNodes(db *sql.DB) int {
 	}
 
 	return count
+}
+
+func addTagsToNode(db *sql.DB, nodeID int, tags []string) error {
+	for _, tagName := range tags {
+		// Insert tag if it doesn't exist
+		_, err := db.Exec("INSERT OR IGNORE INTO tags (name) VALUES (?)", tagName)
+		if err != nil {
+			return err
+		}
+
+		// Get the tag ID
+		var tagID int
+		err = db.QueryRow("SELECT id FROM tags WHERE name = ?", tagName).Scan(&tagID)
+		if err != nil {
+			return err
+		}
+
+		// Insert into junction table (ignore if already linked)
+		_, err = db.Exec(
+			"INSERT OR IGNORE INTO junction_node_tags (item_id, tag_id) VALUES (?, ?)",
+			nodeID, tagID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func removeTagsFromNode(db *sql.DB, nodeID int, tags []string) error {
+	for _, tagName := range tags {
+		var tagID int
+		err := db.QueryRow("SELECT id FROM tags WHERE name = ?", tagName).Scan(&tagID)
+		if err != nil {
+			continue // Tag doesn't exist, skip
+		}
+
+		_, err = db.Exec(
+			"DELETE FROM junction_node_tags WHERE item_id = ? AND tag_id = ?",
+			nodeID, tagID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

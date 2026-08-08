@@ -29,15 +29,17 @@ func main() {
 		fmt.Println("Failed to ping database")
 	}
 
-	if err := initDatabase(db); err != nil {
-		fmt.Println("Failed to initialize schema:")
+	// if there was an error trying to stat db, its the first time,
+	// so seed the db
+	if firstStartup != nil {
+
+		if err := initDatabase(db); err != nil {
+			fmt.Println("Failed to initialize schema:")
+		}
+		seedDB(db)
 	}
 
 	fmt.Println("Successfully connected to SQLite database")
-
-	if firstStartup != nil {
-		seedDB(db)
-	}
 
 	startWebserver(db)
 

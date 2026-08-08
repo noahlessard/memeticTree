@@ -1,12 +1,17 @@
 package main
 
-// variables must be declared outside of templ function
+// add the LUCA dynamically
 func getNodeName(node Node) string {
 	nameString := node.Name
 	if len(node.Parents) == 0 {
 		nameString = "LUCA: " + nameString
 	}
 	return nameString
+}
+
+// build the search query string dynamically
+func buildTagString(tagInput string) string {
+    return "/search?query=" + tagInput + "&searchType=tags" 
 }
 
 templ subpage(node Node) {
@@ -31,9 +36,18 @@ templ subpage(node Node) {
 
     <div class="center-image-text">
         <img src={ node.ImagePath } class="tree-img">
-         <p>
+
+        <div>
+         <p> <b>Description:</b> <br>
              { node.Description }
          </p>
+
+         <p> <b>Tags:</b> <br>
+            for _, tag := range node.Tags {
+                <a href={ buildTagString(tag) }>>{ tag }</a><br>
+            }
+         </p>
+         </div>
 
     </div>
 
