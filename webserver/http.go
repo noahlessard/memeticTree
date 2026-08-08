@@ -59,17 +59,24 @@ func makeRandompageHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// TODO: Limit the amount of search results returned, pagination?
 func handleSearch(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var results []Node
+		var searchType string
 
 		// if form was submitted, search for results
 		if r.Method == "POST" {
 			searchQuery := r.FormValue("nodeinput")
-			results = getnodeByName(db, searchQuery)
+			searchType = r.FormValue("searchType")
+			if searchType == "name" {
+				results = getnodeByName(db, searchQuery)
+			} else {
+				fmt.Println("got the following tags: " + searchQuery)
+			}
 		}
 
 		// render the search component with or without results
-		templ.Handler(search(results)).ServeHTTP(w, r)
+		templ.Handler(search(results, searchType)).ServeHTTP(w, r)
 	}
 }

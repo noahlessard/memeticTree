@@ -2,7 +2,7 @@ package main
 
 const layout = "2006-01-02 15:04:05"
 
-templ search(results []Node) {
+templ search(results []Node, selectedType string) {
 
 <!DOCTYPE html>
 <html>
@@ -15,11 +15,17 @@ templ search(results []Node) {
     
     @links()
     
-    <form method="POST" action="/search">
-        <h3>Search for a node by name:</h3>
-        <input type="text" id="nodeinput" name="nodeinput">
-        <input type="submit" value="Submit">
-    </form>
+	<form method="POST" action="/search">
+		<div style="display: flex; gap: 1rem; align-items: center; justify-content: center;">
+			<h3>Search for a node by:</h3>
+			<select name="searchType">
+				<option value="name" selected?={ selectedType == "name" }>Name</option>
+				<option value="tags" selected?={ selectedType == "tags" }>Tags</option>
+			</select>
+		</div>
+		<input type="text" id="nodeinput" name="nodeinput">
+		<input type="submit" value="Submit">
+	</form>
 
     if len(results) > 0 {
         <h2>Results:</h2>

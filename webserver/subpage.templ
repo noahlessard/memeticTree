@@ -1,5 +1,13 @@
 package main
 
+// variables must be declared outside of templ function
+func getNodeName(node Node) string {
+	nameString := node.Name
+	if len(node.Parents) == 0 {
+		nameString = "LUCA: " + nameString
+	}
+	return nameString
+}
 
 templ subpage(node Node) {
 
@@ -8,13 +16,14 @@ templ subpage(node Node) {
 
 @style()
 
+
 <body>
     <div class="center">
     @homebutton()    
     
     @links()
-    
-    <h3>{ node.Name }</h3>
+
+    <h3> { getNodeName(node) }</h3>
 
     <div class="border">
 
