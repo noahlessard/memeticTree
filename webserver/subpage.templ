@@ -1,6 +1,7 @@
 package main
 
-templ subpage() {
+
+templ subpage(node Node) {
 
 <!DOCTYPE html>
 <html>
@@ -13,22 +14,24 @@ templ subpage() {
     
     @links()
     
-    <h3>Claude Running the Sink: Variant XXXX</h3>
+    <h3>{ node.Name }</h3>
 
     <div class="border">
+
+    @offspring("Memetic Ancestors")
+
 
     <div class="center-image-text">
         <img src="/assets/tweet.jpg" class="tree-img">
          <p>
-             Here is the description of the image. It might contain some history.
-             Perhaps there are also statistics here.
+             { node.Description }
          </p>
 
     </div>
 
     <br><br>
 
-    @offspring()
+    @offspring("Memetic Offspring")
 
     </div>
 

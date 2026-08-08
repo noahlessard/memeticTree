@@ -2,7 +2,7 @@
 
 ![homepage](homepage.png)
 
-The goal of this project is to provide very efficient image storage while also generate interesting anthropological statistics based off of submitted content. And, to have fun!
+The goal of this project is to provide very efficient image storage while also generating interesting anthropological statistics based off of submitted content. And, to have fun!
 
 ## Tech Stack:
 - Store images as avif, super compressed, with jpg as a hot cache for frequent images
@@ -24,3 +24,4 @@ The goal of this project is to provide very efficient image storage while also g
     - Enter webserver directory 
     - Build templ files with: `go tool templ generate`
     - Run with `go run .`
+- It is highly recommended to install the templ vscode extension if you are going to be working with the frontend, since templ files can be messy.
