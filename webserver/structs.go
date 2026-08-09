@@ -15,6 +15,7 @@ type Node struct {
 }
 
 type Submission struct {
+	Name             string
 	ImagePath        string
 	RelationshipType string
 	PotentialTags    []string

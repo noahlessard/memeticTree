@@ -120,8 +120,26 @@ func handleSearch(db *sql.DB) http.HandlerFunc {
 func handleSubmission(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var selectedString string
-		var selectedTags []string
+		var selectedTagString string
 		var selectedType string
+		// set this to true when we submit okay
+		status := false
+
+		// TODO: maybe break this structure out into a helper?
+		selectedString = r.FormValue("nameinput")
+		if selectedString == "" {
+			selectedString = r.URL.Query().Get("nameinput")
+		}
+
+		// can be none, parent, or child
+		selectedType = r.FormValue("searchType")
+		if selectedType == "" {
+			selectedType = r.URL.Query().Get("searchType")
+		}
+		selectedTagString = r.FormValue("tagsinput")
+		if selectedTagString == "" {
+			selectedTagString = r.URL.Query().Get("tagsinput")
+		}
 
 		if r.Method == "POST" {
 
@@ -156,7 +174,7 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 			io.Copy(dst, file)
 
 			// gets the tags from the string
-			tagSplit := strings.Split(r.FormValue("tagsinput"), ",")
+			tagSplit := strings.Split(selectedTagString, ",")
 			tags := make([]string, len(tagSplit))
 			for i, tag := range tagSplit {
 				tags[i] = strings.TrimSpace(tag)
@@ -164,17 +182,18 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 
 			submissionNode := Submission{
 				ImagePath:        "./uploads/" + header.Filename,
-				RelationshipType: r.FormValue("searchType"),
+				RelationshipType: selectedType,
 				PotentialTags:    tags,
 			}
 
 			// TODO: Create the node in the submission db table
 			fmt.Println(submissionNode)
+			status = true
 
-			templ.Handler(submission(selectedString, selectedTags, selectedType)).ServeHTTP(w, r)
+			templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
 			return
 		}
-		templ.Handler(submission(selectedString, selectedTags, selectedType)).ServeHTTP(w, r)
+		templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
 	}
 }
 

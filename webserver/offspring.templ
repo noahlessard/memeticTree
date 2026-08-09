@@ -2,9 +2,10 @@ package main
 
 import (
     "fmt"
+    "strings"
 )
 
-templ offspring(text string, offspringNodes []Node) {
+templ offspring(name string, text string, offspringNodes []Node) {
     
     if len(offspringNodes) > 0 {
 
@@ -15,8 +16,16 @@ templ offspring(text string, offspringNodes []Node) {
         <p><a href={ "/subpage?id=" + fmt.Sprint(node.ID) }>{ node.Name }</a></p>
     }
     </div>
+    } else {
+        <p>{ text }: None</p>
     }
 
-    <p>Add a node here by <a href="/submission">submitting</a></p>
+
+    if strings.Contains(text, "Offspring"){
+        <p><a href={ "/submission?searchType=child&nameinput=" + name }>+Add an offspring</a></p>
+    } else {
+        <p><a href={ "/submission?searchType=parent&nameinput=" + name}>+Add a parent</a></p>
+
+    }
 
 }

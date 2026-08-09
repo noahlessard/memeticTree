@@ -1,6 +1,6 @@
 package main
 
-templ submission(selectedString string, selectedTags []string, selectedType string) {
+templ submission(selectedString string, selectedTags string, selectedType string, status bool) {
 
 <!DOCTYPE html>
 <html>
@@ -19,20 +19,26 @@ templ submission(selectedString string, selectedTags []string, selectedType stri
     <p>Thank you for taking the time to submit a meme to this archive. You don't need an account to submit, but if you would like to track your contributions or have them count towards becoming a moderator, consider creating an account first.</p>
 
     <p> You can reference an existing node in the archive by putting its name here: </p>
-    <input type="text" name="nameinput" value="">
+    <input type="text" name="nameinput" value={selectedString}>
     <select name="searchType">
+    	<option value="none" selected?={ selectedType == "none" }></option>
 	    <option value="parent" selected?={ selectedType == "parent" }>Link to the existing node as a new parent</option>
 		<option value="child" selected?={ selectedType == "child" }>Link to the existing node as a new child</option>
 	</select>
 
     <p> Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags can be any topic, from the type of platform the image was posted to, characters depicted in the meme, or anything else that you think might be useful to identify it.</p>
-    <input type="text" name="tagsinput" value="">
+    <input type="text" name="tagsinput" value={selectedTags}>
 
     <p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p>
 
         <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required />
         <button type="submit">Upload all info</button>
     </form>
+
+    if status == true{
+        <p>Successfully submitted!</p>
+    }
+ 
 
     </div>
 
