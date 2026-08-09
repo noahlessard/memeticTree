@@ -1,0 +1,33 @@
+package main
+
+templ submission() {
+
+<!DOCTYPE html>
+<html>
+
+@style()
+
+<body>
+    <div class="center">
+    @homebutton()    
+    
+    @links()
+    
+    <h3>Submissions:</h3>
+
+    <p>Thank you for taking the time to submit a meme to this archive. You don't need an account to submit, but if you would like to track your contributions or have them count towards becoming a moderator, consider creating an account first.</p>
+
+    <p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p>
+
+    <form method="POST" enctype="multipart/form-data">
+        <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required />
+        <button type="submit">Upload</button>
+    </form>
+
+    </div>
+
+</body>
+
+</html>
+
+}

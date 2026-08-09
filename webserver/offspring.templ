@@ -12,7 +12,7 @@ templ offspring(text string, offspringNodes []Node) {
 
     <div class="h2-row">
         for _, node := range offspringNodes {
-        <h4><a href={ "/subpage?id=" + fmt.Sprint(node.ID) }>{ node.Name }</a></h4>
+        <p><a href={ "/subpage?id=" + fmt.Sprint(node.ID) }>{ node.Name }</a></p>
     }
     </div>
     }
