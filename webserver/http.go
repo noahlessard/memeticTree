@@ -119,7 +119,12 @@ func handleSearch(db *sql.DB) http.HandlerFunc {
 
 func handleSubmission(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var selectedString string
+		var selectedTags []string
+		var selectedType string
+
 		if r.Method == "POST" {
+
 			file, header, err := r.FormFile("image")
 			if err != nil {
 				http.Error(w, "No file uploaded", http.StatusBadRequest)
@@ -149,10 +154,27 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 			defer dst.Close()
 
 			io.Copy(dst, file)
-			templ.Handler(submission()).ServeHTTP(w, r)
+
+			// gets the tags from the string
+			tagSplit := strings.Split(r.FormValue("tagsinput"), ",")
+			tags := make([]string, len(tagSplit))
+			for i, tag := range tagSplit {
+				tags[i] = strings.TrimSpace(tag)
+			}
+
+			submissionNode := Submission{
+				ImagePath:        "./uploads/" + header.Filename,
+				RelationshipType: r.FormValue("searchType"),
+				PotentialTags:    tags,
+			}
+
+			// TODO: Create the node in the submission db table
+			fmt.Println(submissionNode)
+
+			templ.Handler(submission(selectedString, selectedTags, selectedType)).ServeHTTP(w, r)
 			return
 		}
-		templ.Handler(submission()).ServeHTTP(w, r)
+		templ.Handler(submission(selectedString, selectedTags, selectedType)).ServeHTTP(w, r)
 	}
 }
 

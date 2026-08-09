@@ -8,7 +8,7 @@ package main
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func submission() templ.Component {
+func submission(selectedString string, selectedTags []string, selectedType string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,7 +49,27 @@ func submission() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h3>Submissions:</h3><p>Thank you for taking the time to submit a meme to this archive. You don't need an account to submit, but if you would like to track your contributions or have them count towards becoming a moderator, consider creating an account first.</p><p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p><form method=\"POST\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required> <button type=\"submit\">Upload</button></form></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h3>Submissions:</h3><form method=\"POST\" enctype=\"multipart/form-data\"><p>Thank you for taking the time to submit a meme to this archive. You don't need an account to submit, but if you would like to track your contributions or have them count towards becoming a moderator, consider creating an account first.</p><p>You can reference an existing node in the archive by putting its name here: </p><input type=\"text\" name=\"nameinput\" value=\"\"> <select name=\"searchType\"><option value=\"parent\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if selectedType == "parent" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, ">Link to the existing node as a new parent</option> <option value=\"child\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if selectedType == "child" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " selected")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, ">Link to the existing node as a new child</option></select><p>Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags can be any topic, from the type of platform the image was posted to, characters depicted in the meme, or anything else that you think might be useful to identify it.</p><input type=\"text\" name=\"tagsinput\" value=\"\"><p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p><input type=\"file\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required> <button type=\"submit\">Upload all info</button></form></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

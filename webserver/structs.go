@@ -13,3 +13,9 @@ type Node struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+type Submission struct {
+	ImagePath        string
+	RelationshipType string
+	PotentialTags    []string
+}
