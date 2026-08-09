@@ -133,6 +133,13 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 				return
 			}
 
+			// make dir for uploads
+			err = os.Mkdir("./uploads/", 0750)
+			if err != nil && !os.IsExist(err) {
+				http.Error(w, "Failed to create uploads/", http.StatusInternalServerError)
+				return
+			}
+
 			// Save to disk
 			dst, err := os.Create("./uploads/" + header.Filename)
 			if err != nil {
