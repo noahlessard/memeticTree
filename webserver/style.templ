@@ -20,6 +20,8 @@ templ style() {
     margin: auto;
   }
 
+
+
   .center-image-text {
     display: flex;
     align-items: center;
@@ -27,13 +29,21 @@ templ style() {
     justify-content: center;
   }
 
+  @media (max-width: 800px) {
+    .center-image-text {
+      display: block;
+      align-items: center;
+      justify-content: center;
+    }
+
+  }
+
   .main-img {
     height: 400px;
   }
 
   .tree-img {
-    max-height: 400px;
-    max-width: 400px;
+    max-width: 30vw;
     height: auto;
     width: auto;
   }
