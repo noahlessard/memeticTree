@@ -2,12 +2,11 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"io"
 	"math/rand"
-	"mime/multipart"
 	"net/http"
-	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,14 +17,12 @@ import (
 
 var lastUpload sync.Map
 
-const rateLimit = 60 * time.Second
+const rateLimit = 30 * time.Second
 const fileSize = 2 * 1024 * 1024
+const memLimit = 5 * 1024 * 1024
+const tagLimit = 100
 
-var allowedTypes = map[string]bool{
-	"image/jpeg": true,
-	"image/png":  true,
-	"image/webp": true,
-}
+var allowedSearches = [3]string{"none", "parent", "child"}
 
 func startWebserver(db *sql.DB) {
 
@@ -125,113 +122,143 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 		// set this to true when we submit okay
 		status := false
 
-		// TODO: maybe break this structure out into a helper?
-		selectedString = r.FormValue("nameinput")
-		if selectedString == "" {
-			selectedString = r.URL.Query().Get("nameinput")
-		}
+		if r.Method == "GET" {
+			// TODO: maybe break this structure out into a helper?
+			selectedString = strings.TrimSpace(r.FormValue("nameinput"))
+			if selectedString == "" {
+				selectedString = r.URL.Query().Get("nameinput")
+			}
+			// can be none, parent, or child (see above consts)
+			selectedType = strings.TrimSpace(r.FormValue("searchType"))
+			if selectedType == "" {
+				selectedType = r.URL.Query().Get("searchType")
+			}
+			selectedTagString = strings.TrimSpace(r.FormValue("tagsinput"))
+			if selectedTagString == "" {
+				selectedTagString = r.URL.Query().Get("tagsinput")
+			}
 
-		// can be none, parent, or child
-		selectedType = r.FormValue("searchType")
-		if selectedType == "" {
-			selectedType = r.URL.Query().Get("searchType")
-		}
-		selectedTagString = r.FormValue("tagsinput")
-		if selectedTagString == "" {
-			selectedTagString = r.URL.Query().Get("tagsinput")
-		}
+			templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
+			return
+		} else if r.Method == "POST" {
 
-		if r.Method == "POST" {
-
-			file, header, err := r.FormFile("image")
-			if err != nil {
-				http.Error(w, "No file uploaded", http.StatusBadRequest)
+			// bound the body before anything reads it
+			// this will return a hard error but good safety stop
+			r.Body = http.MaxBytesReader(w, r.Body, fileSize)
+			if err := r.ParseMultipartForm(memLimit); err != nil {
+				http.Error(w, "request too large to parse!", http.StatusBadRequest)
 				return
 			}
-			defer file.Close()
 
-			// check file size, type, and rate limit
-			if err := validateUpload(r, header); err != nil {
+			// TODO: maybe break this structure out into a helper?
+			selectedString = strings.TrimSpace(r.FormValue("nameinput"))
+			if selectedString == "" {
+				selectedString = r.URL.Query().Get("nameinput")
+			}
+			// can be none, parent, or child (see above consts)
+			selectedType = strings.TrimSpace(r.FormValue("searchType"))
+			if selectedType == "" {
+				selectedType = r.URL.Query().Get("searchType")
+			}
+			selectedTagString = strings.TrimSpace(r.FormValue("tagsinput"))
+			if selectedTagString == "" {
+				selectedTagString = r.URL.Query().Get("tagsinput")
+			}
+
+			// validate strings
+			cleanTags, err := returnCleanSubmissionFields(selectedString, selectedTagString, selectedType)
+			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			// make dir for uploads
-			err = os.Mkdir("./uploads/", 0750)
-			if err != nil && !os.IsExist(err) {
-				http.Error(w, "Failed to create uploads/", http.StatusInternalServerError)
-				return
-			}
-
-			// Save to disk
-			dst, err := os.Create("./uploads/" + header.Filename)
+			// parse out file now that we know its under size
+			file, header, err := r.FormFile("image")
 			if err != nil {
-				http.Error(w, "Failed to save file", http.StatusInternalServerError)
+				http.Error(w, "Error: No file uploaded", http.StatusBadRequest)
 				return
 			}
-			defer dst.Close()
+			defer file.Close()
 
-			io.Copy(dst, file)
+			// checker header type anyways, just in case it prevent expensive file ops
+			// gets content type as 'image/*format*/
+			clientContentType := header.Header.Get("Content-Type")
+			foundHeader := false
+			for _, item := range allowedTypes {
+				if clientContentType == item {
+					foundHeader = true
+					break
+				}
+			}
+			if foundHeader == false {
+				http.Error(w, "Error: incorrect content type", http.StatusBadRequest)
+				return
+			}
 
-			// gets the tags from the string
-			tagSplit := strings.Split(selectedTagString, ",")
-			tags := make([]string, len(tagSplit))
-			for i, tag := range tagSplit {
-				tags[i] = strings.TrimSpace(tag)
+			// check actual file dimensions, type, contents
+			// filetype is returned as 'image/*format*'
+			err, filetype := safeCheckContents(file)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			// actually save image
+			err, filepath := safeSaveFile(file, filetype)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
 			}
 
 			submissionNode := Submission{
-				ImagePath:        "./uploads/" + header.Filename,
+				ImagePath:        filepath,
 				RelationshipType: selectedType,
-				PotentialTags:    tags,
+				PotentialTags:    cleanTags,
 			}
 
 			// TODO: Create the node in the submission db table
+			// check sql injection stuff
 			fmt.Println(submissionNode)
 			status = true
 
 			templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
 			return
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
-		templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
 	}
 }
 
-func validateUpload(r *http.Request, header *multipart.FileHeader) error {
+// putting some extra parsing code here... maybe overkill
+// will return the tags field as an array instead of just a string
+// these don't need to check the size bc go already limit get size reasonably
+func returnCleanSubmissionFields(name string, tags string, searchtype string) ([]string, error) {
 
-	// Check file size ( less than 2 MB )
-	if header.Size > fileSize {
-		return fmt.Errorf("file too large")
+	// check tag size
+	tagSplit := strings.Split(tags, ",")
+	if len(tagSplit) > tagLimit {
+		return []string{}, errors.New("Error: too many tags submitted")
 	}
 
-	// Check file type
-	// TODO: actually check contents and not just content-type?
-	if !allowedTypes[header.Header.Get("Content-Type")] {
-		return fmt.Errorf("Invalid file type")
+	// check searchtype is valid (code injection?)
+	if slices.Contains(allowedSearches[:], searchtype) != true {
+		return []string{}, errors.New("Error: no valid search type submitted")
 	}
 
-	// Check rate limit based on ip time
-	ip := strings.Split(r.RemoteAddr, ":")[0]
+	// check name actually exists
+	// enforce exact name
+	// SQL inject?
+	//if len(getnodeByName(name)) != 1 {
+	//	return []string{}, errors.new("Error: could not find node with that name. Match must be exact!")
+	//}
 
-	// remove old entries from the ip map if they have times 10x older
-	// than the rate limit window (prevent unbounded growth)
-	cleanupOldEntries(time.Now().Add(-rateLimit * 10))
-
-	if last, ok := lastUpload.Load(ip); ok {
-		if time.Since(last.(time.Time)) < rateLimit {
-			return fmt.Errorf("rate limit exceeded: please wait %v", rateLimit)
-		}
+	// build and return tag array
+	tagsArr := make([]string, len(tagSplit))
+	for i, tag := range tagSplit {
+		tagsArr[i] = strings.TrimSpace(tag)
 	}
 
-	lastUpload.Store(ip, time.Now())
-	return nil
-}
+	return tagsArr, nil
 
-func cleanupOldEntries(cutoffTime time.Time) {
-	lastUpload.Range(func(key, value interface{}) bool {
-		if value.(time.Time).Before(cutoffTime) {
-			lastUpload.Delete(key)
-		}
-		return true
-	})
 }

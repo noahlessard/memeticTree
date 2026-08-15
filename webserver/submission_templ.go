@@ -92,7 +92,7 @@ func submission(selectedString string, selectedTags string, selectedType string,
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, ">Link to the existing node as a new child</option></select><p>Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags can be any topic, from the type of platform the image was posted to, characters depicted in the meme, or anything else that you think might be useful to identify it.</p><input type=\"text\" name=\"tagsinput\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, ">Link to the existing node as a new child</option></select><p>Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags should be adjectives / categories that aren't memes themselves. Good tag examples include: \"notext\" , \"video game\", \"twitter\", \"programming.\" </p><input type=\"text\" name=\"tagsinput\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -105,7 +105,7 @@ func submission(selectedString string, selectedTags string, selectedType string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p><input type=\"file\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required> <button type=\"submit\">Upload all info</button></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p><input type=\"file\" id=\"image\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required> <button type=\"submit\">Upload all info</button></form><script>\n        document.getElementById(\"image\").form.onsubmit = function () {\n            var f = document.getElementById(\"image\").files[0];\n            if (f && f.size > 2097152) {\n                alert(\"File too large, must be under 2MB\");\n                return false;\n            }\n            return true;\n        };\n    </script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

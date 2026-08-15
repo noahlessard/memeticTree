@@ -26,14 +26,25 @@ templ submission(selectedString string, selectedTags string, selectedType string
 		<option value="child" selected?={ selectedType == "child" }>Link to the existing node as a new child</option>
 	</select>
 
-    <p> Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags can be any topic, from the type of platform the image was posted to, characters depicted in the meme, or anything else that you think might be useful to identify it.</p>
+    <p> Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags should be adjectives / categories that aren't memes themselves. Good tag examples include: "notext" , "video game", "twitter", "programming." </p>
     <input type="text" name="tagsinput" value={selectedTags}>
 
     <p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p>
 
-        <input type="file" name="image" accept="image/jpeg,image/png,image/webp" required />
+        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp" required />
         <button type="submit">Upload all info</button>
     </form>
+
+    <script>
+        document.getElementById("image").form.onsubmit = function () {
+            var f = document.getElementById("image").files[0];
+            if (f && f.size > 2097152) {
+                alert("File too large, must be under 2MB");
+                return false;
+            }
+            return true;
+        };
+    </script>
 
     if status == true{
         <p>Successfully submitted!</p>
