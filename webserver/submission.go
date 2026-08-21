@@ -14,6 +14,7 @@ import (
 
 	_ "golang.org/x/image/webp"
 
+	"github.com/gen2brain/avif"
 	"github.com/google/uuid"
 )
 
@@ -28,57 +29,77 @@ const (
 	maxImageHeight = 10000
 )
 
-func safeCheckContents(inputfile multipart.File) (error, string) {
-
-	var actualType string
+func safeCheckContents(inputfile multipart.File) error {
 
 	// first check the actual content is on the whitelist
 	// read the first chunk of the request body
 	var first512 [512]byte
 	n, err := io.ReadFull(inputfile, first512[:])
 	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
-		return errors.New("Error: file not able to be read"), actualType
+		return errors.New("Error: file not able to be read")
 	}
 
 	// detect and validate the content type
 	contentType := http.DetectContentType(first512[:n])
 	if !strings.HasPrefix(contentType, "image/") {
-		return errors.New("Error: content type not an image"), actualType
+		return errors.New("Error: content type not an image")
 	}
 
 	// make sure its one of the ones we like
 	foundItem := false
 	for _, item := range allowedTypes {
-		if strings.HasSuffix(contentType, item) {
-			actualType = item
+		if contentType == item {
 			foundItem = true
 			break
 		}
 	}
 
 	if foundItem == false {
-		return errors.New("Error: content type not in allowlist"), actualType
+		return errors.New("Error: content type not in allowlist")
 	}
 
 	// Go to start of file
 	if _, err := inputfile.Seek(0, io.SeekStart); err != nil {
-		return errors.New("Error: file not able to be rewinded"), actualType
+		return errors.New("Error: file not able to be rewinded")
 	}
 
 	// read only the header for dimensions so we can't explode memory on the server
 	cfg, _, err := image.DecodeConfig(inputfile)
 	if err != nil {
-		return errors.New("Error: image dimensions not readable"), actualType
+		return errors.New("Error: image dimensions not readable")
 	}
 	if cfg.Width > maxImageWidth || cfg.Height > maxImageHeight {
-		return errors.New("Error: image dimensions too large"), actualType
+		return errors.New("Error: image dimensions too large")
 	}
 
-	return nil, actualType
+	return nil
 
 }
 
-func safeSaveFile(inputfile multipart.File, filetype string) (error, string) {
+func convertToAVIF(inputfile multipart.File, output *os.File) error {
+	if _, err := inputfile.Seek(0, io.SeekStart); err != nil {
+		return errors.New("error: failed to rewind")
+	}
+
+	img, _, err := image.Decode(inputfile)
+	if err != nil {
+		return errors.New("error: failed to decode")
+	}
+
+	err = avif.Encode(output, img, avif.Options{
+		Quality:           60,
+		QualityAlpha:      60,
+		Speed:             8,
+		ChromaSubsampling: image.YCbCrSubsampleRatio420,
+	})
+
+	if err != nil {
+		return errors.New("error: failed to encode as AVIF")
+	}
+
+	return nil
+}
+func safeSaveFile(inputfile multipart.File) (error, string) {
 
 	// 20 GB
 	// assuming max file size is 2 MB, this is 10,000 files
@@ -115,11 +136,8 @@ func safeSaveFile(inputfile multipart.File, filetype string) (error, string) {
 
 	// generate unique string name
 	// get file type again, now that we trust it, if it doesn't split okay something went wrong (so throw err)
-	fileExtArray := strings.Split(filetype, "/")
-	if len(fileExtArray) != 2 {
-		return errors.New("Error: couldn't split string okay"), fileloc
-	}
-	fileloc = "../uploads/" + uuid.NewString() + "." + fileExtArray[1]
+
+	fileloc = "../uploads/" + uuid.NewString() + ".avif"
 
 	// save to disk, use safe open flags
 	dst, err := os.OpenFile(fileloc, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -128,28 +146,17 @@ func safeSaveFile(inputfile multipart.File, filetype string) (error, string) {
 	}
 
 	// need to rewind the input file (we read the first 512 bytes to get image type)
-	_, err = inputfile.Seek(0, io.SeekStart)
+	err = convertToAVIF(inputfile, dst)
 	if err != nil {
-		return errors.New("Error: failed to rewind uploaded file"), fileloc
+		_ = dst.Close()
+		_ = os.Remove(fileloc)
+		return err, fileloc
 	}
 
-	// NICO: Call your avif function here I think, just have to take in the multipart.File
-
-	// Copy the uploaded data to disk.
-	_, err = io.Copy(dst, inputfile)
-	if err != nil {
-		// atleast attempt to remove the file
+	if err := dst.Close(); err != nil {
 		_ = os.Remove(fileloc)
-		return errors.New("Error: failed to copy data into file"), fileloc
-	}
-
-	err = dst.Close()
-	if err != nil {
-		// atleast attempt to remove the file
-		_ = os.Remove(fileloc)
-		return errors.New("Error: failed closing file after copying data"), fileloc
+		return errors.New("Error: failed closing AVIF file"), fileloc
 	}
 
 	return nil, fileloc
-
 }
