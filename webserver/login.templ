@@ -1,0 +1,35 @@
+package main
+
+templ login(csrf string, errMsg string) {
+
+<!DOCTYPE html>
+<html>
+
+@style()
+
+<body>
+    <div class="center">
+    @homebutton()    
+    
+    @links()
+    
+    <h3>Moderator Login:</h3>
+
+    <form method="POST" action="/login">
+        <input type="hidden" name="csrf" value={ csrf }>
+        <input type="text" name="name" value="" placeholder="Username"><br>
+        <input type="password" name="password" value="" placeholder="Password"><br>
+        <button type="submit">Log in</button>
+    </form>
+
+    if errMsg != "" {
+        <p>{ errMsg }</p>
+    }
+
+    </div>
+
+</body>
+
+</html>
+
+}

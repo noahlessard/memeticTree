@@ -31,6 +31,7 @@ func main() {
 
 	// if there was an error trying to stat db, its the first time,
 	// so seed the db
+	// seed db also creates a test user!
 	if firstStartup != nil {
 
 		if err := initDatabase(db); err != nil {

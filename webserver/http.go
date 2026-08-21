@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -33,16 +34,16 @@ func startWebserver(db *sql.DB) {
 
 	// serve html from templ
 	http.Handle("/", templ.Handler(homepage(db)))
-
-	http.HandleFunc("/subpage", makeSubpageHandler(db))
-
-	http.HandleFunc("/submission", handleSubmission(db))
-
-	http.Handle("/search", handleSearch(db))
-
-	http.HandleFunc("/random", makeRandompageHandler(db))
-
 	http.Handle("/about", templ.Handler(about()))
+
+	// server html from our custom functions
+	http.HandleFunc("/subpage", makeSubpageHandler(db))
+	http.HandleFunc("/submission", handleSubmission(db))
+	http.HandleFunc("/search", makeHandleSearch(db))
+	http.HandleFunc("/random", makeRandompageHandler(db))
+	http.HandleFunc("/login", makeHandleLogin(db))
+	http.HandleFunc("/logout", makeHandleLogout())
+	http.HandleFunc("/moderator", requireAuth(makeModeration()))
 
 	fmt.Println("Listening on :3000")
 	http.ListenAndServe(":3000", nil)
@@ -76,7 +77,7 @@ func makeRandompageHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // TODO: Limit the amount of search results returned, pagination?
-func handleSearch(db *sql.DB) http.HandlerFunc {
+func makeHandleSearch(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var results []Node
 		var searchType string
@@ -114,6 +115,64 @@ func handleSearch(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+func makeHandleLogin(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+
+			// check that csrf is valid
+			c, _ := r.Cookie(csrfName)
+			if len(c.Value) <= 0 &&
+				subtle.ConstantTimeCompare([]byte(c.Value), []byte(r.FormValue("csrf"))) != 1 {
+				http.Error(w, "invalid csrf token", http.StatusForbidden)
+				return
+			}
+
+			// verify login-form csrf (defense in depth on top of SameSite)
+			// check that it matches what the form said
+			name := r.FormValue("name")
+			if isMod(db, name, r.FormValue("password")) {
+				// create the CSRF side of the token
+				csrf, err := newToken()
+				if err != nil {
+					http.Error(w, "internal error", http.StatusInternalServerError)
+					return
+				}
+				// this session is good, create and store it
+				session := modSession{user: name, csrf: csrf, expires: time.Now().Add(sessionTTL)}
+				if err := setSession(w, r, session); err != nil {
+					http.Error(w, "internal error", http.StatusInternalServerError)
+					return
+				}
+				http.Redirect(w, r, "/moderator", http.StatusSeeOther)
+				return
+			}
+
+			// bad creds: re-render the form, keep the csrf cookie valid
+			templ.Handler(login(getOrCreateCSRF(w, r), "Invalid username or password")).ServeHTTP(w, r)
+			return
+		}
+
+		templ.Handler(login(getOrCreateCSRF(w, r), "")).ServeHTTP(w, r)
+	}
+}
+
+func makeHandleLogout() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		clearSession(w, r)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
+}
+
+// authedHandler is an http.HandlerFunc that also receives the validated session.
+// requiring this signature means a handler can't be registered without requireAuth!
+type authedHandler func(w http.ResponseWriter, r *http.Request, session modSession)
+
+func makeModeration() authedHandler {
+	return func(w http.ResponseWriter, r *http.Request, session modSession) {
+		templ.Handler(modpanel(session.user)).ServeHTTP(w, r)
+	}
+}
+
 func handleSubmission(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var selectedString string
@@ -122,22 +181,22 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 		// set this to true when we submit okay
 		status := false
 
-		if r.Method == "GET" {
-			// TODO: maybe break this structure out into a helper?
-			selectedString = strings.TrimSpace(r.FormValue("nameinput"))
-			if selectedString == "" {
-				selectedString = r.URL.Query().Get("nameinput")
-			}
-			// can be none, parent, or child (see above consts)
-			selectedType = strings.TrimSpace(r.FormValue("searchType"))
-			if selectedType == "" {
-				selectedType = r.URL.Query().Get("searchType")
-			}
-			selectedTagString = strings.TrimSpace(r.FormValue("tagsinput"))
-			if selectedTagString == "" {
-				selectedTagString = r.URL.Query().Get("tagsinput")
-			}
+		// always get this items regardless
+		selectedString = strings.TrimSpace(r.FormValue("nameinput"))
+		if selectedString == "" {
+			selectedString = r.URL.Query().Get("nameinput")
+		}
+		// can be none, parent, or child (see above consts)
+		selectedType = strings.TrimSpace(r.FormValue("searchType"))
+		if selectedType == "" {
+			selectedType = r.URL.Query().Get("searchType")
+		}
+		selectedTagString = strings.TrimSpace(r.FormValue("tagsinput"))
+		if selectedTagString == "" {
+			selectedTagString = r.URL.Query().Get("tagsinput")
+		}
 
+		if r.Method == "GET" {
 			templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
 			return
 		} else if r.Method == "POST" {
@@ -148,21 +207,6 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 			if err := r.ParseMultipartForm(memLimit); err != nil {
 				http.Error(w, "request too large to parse!", http.StatusBadRequest)
 				return
-			}
-
-			// TODO: maybe break this structure out into a helper?
-			selectedString = strings.TrimSpace(r.FormValue("nameinput"))
-			if selectedString == "" {
-				selectedString = r.URL.Query().Get("nameinput")
-			}
-			// can be none, parent, or child (see above consts)
-			selectedType = strings.TrimSpace(r.FormValue("searchType"))
-			if selectedType == "" {
-				selectedType = r.URL.Query().Get("searchType")
-			}
-			selectedTagString = strings.TrimSpace(r.FormValue("tagsinput"))
-			if selectedTagString == "" {
-				selectedTagString = r.URL.Query().Get("tagsinput")
 			}
 
 			// validate strings
@@ -261,4 +305,17 @@ func returnCleanSubmissionFields(name string, tags string, searchtype string) ([
 
 	return tagsArr, nil
 
+}
+
+// wrap our http handler functions with this to require a csrf
+// and redirect to login if one is not found
+func requireAuth(next authedHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session, ok := checkSession(r)
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		next(w, r, session)
+	}
 }

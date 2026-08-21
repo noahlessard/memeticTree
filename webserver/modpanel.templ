@@ -1,0 +1,27 @@
+package main
+
+templ modpanel(user string) {
+
+<!DOCTYPE html>
+<html>
+
+@style()
+
+<body>
+    <div class="center">
+    @homebutton()    
+    
+    @links()
+    
+    <h3>Moderator Panel</h3>
+    <p>Welcome, { user }.</p>
+    <p>Approve Submissions will live here.</p>
+    <a href="/logout">Log out</a>
+
+    </div>
+
+</body>
+
+</html>
+
+}

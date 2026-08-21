@@ -1,3 +1,4 @@
 .DS_Store
 webserver/app.db
 uploads/
+webserver/passwords.txt

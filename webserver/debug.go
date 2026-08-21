@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"fmt"
+	"log"
+	"os"
+	"strings"
 )
 
 func seedDB(db *sql.DB) {
@@ -17,6 +21,24 @@ func seedDB(db *sql.DB) {
 	_, err = db.Exec(`DELETE FROM sqlite_sequence WHERE name='nodes';`)
 	if err != nil {
 		fmt.Println("couldn't reset autoincrement:", err)
+	}
+
+	// open passwords file
+	f, err := os.Open("passwords.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+
+	// extract lines
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fmt.Printf("Creating user: %s\n", scanner.Text())
+		// parse out user / password
+		array := strings.Split(scanner.Text(), ",")
+		if err := CreateUser(db, strings.TrimSpace(array[0]), strings.TrimSpace(array[1])); err != nil {
+			fmt.Printf("couldn't seed moderator %s: %s\n", array[0], err)
+		}
 	}
 
 	// Create nodes and capture their IDs

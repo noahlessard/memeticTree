@@ -15,9 +15,10 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.49 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/mod v0.26.0 // indirect
-	golang.org/x/net v0.51.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/tools v0.35.0 // indirect
