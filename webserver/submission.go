@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -76,12 +78,9 @@ func safeCheckContents(inputfile multipart.File) error {
 
 }
 
-func convertToAVIF(inputfile multipart.File, output *os.File) error {
-	if _, err := inputfile.Seek(0, io.SeekStart); err != nil {
-		return errors.New("error: failed to rewind")
-	}
+func convertToAVIF(data []byte, output *os.File) error {
 
-	img, _, err := image.Decode(inputfile)
+	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return errors.New("error: failed to decode")
 	}
@@ -89,7 +88,7 @@ func convertToAVIF(inputfile multipart.File, output *os.File) error {
 	err = avif.Encode(output, img, avif.Options{
 		Quality:           60,
 		QualityAlpha:      60,
-		Speed:             8,
+		Speed:             5,
 		ChromaSubsampling: image.YCbCrSubsampleRatio420,
 	})
 
@@ -113,7 +112,7 @@ func safeSaveFile(inputfile multipart.File) (error, string) {
 	// make dir for uploads if not already
 	err := os.Mkdir("../uploads/", 0750)
 	if err != nil && !os.IsExist(err) {
-		return errors.New("Error: failed to create uploads/"), fileloc
+		return errors.New("Error: failed to create uploads/"), ""
 	}
 
 	// check that upload dir isn't over limit
@@ -131,32 +130,39 @@ func safeSaveFile(inputfile multipart.File) (error, string) {
 	})
 
 	if size > maxUploadDirSize {
-		return errors.New("Error: uploads over limit, raise limit or clear directory"), fileloc
+		return errors.New("Error: uploads over limit, raise limit or clear directory"), ""
 	}
 
 	// generate unique string name
-	// get file type again, now that we trust it, if it doesn't split okay something went wrong (so throw err)
-
 	fileloc = "../uploads/" + uuid.NewString() + ".avif"
 
-	// save to disk, use safe open flags
-	dst, err := os.OpenFile(fileloc, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if _, err := inputfile.Seek(0, io.SeekStart); err != nil {
+		return errors.New("Error: file not able to be rewinded"), ""
+	}
+	data, err := io.ReadAll(inputfile)
 	if err != nil {
-		return errors.New("Error: failed to create file at disk filepath"), fileloc
+		return errors.New("Error: failed to read upload"), ""
 	}
 
-	// need to rewind the input file (we read the first 512 bytes to get image type)
-	err = convertToAVIF(inputfile, dst)
-	if err != nil {
-		_ = dst.Close()
-		_ = os.Remove(fileloc)
-		return err, fileloc
-	}
+	// define an anonymous function, then run as goroutine
+	// use log here since we can't return error to http
+	go func() {
+		createdFile, err := os.OpenFile(fileloc, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			log.Printf("AVIF: create out: %v", err)
+			return
+		}
+		// if err, try to remove file
+		if err := convertToAVIF(data, createdFile); err != nil {
+			_ = createdFile.Close()
+			_ = os.Remove(fileloc)
+			log.Printf("AVIF: %v", err)
+			return
+		}
+		_ = createdFile.Close()
+	}()
 
-	if err := dst.Close(); err != nil {
-		_ = os.Remove(fileloc)
-		return errors.New("Error: failed closing AVIF file"), fileloc
-	}
-
+	// return the fileloc, assuming the goroutine ran okay
+	// TODO: the code loading these images should be careful about referencing these files
 	return nil, fileloc
 }
