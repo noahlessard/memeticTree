@@ -197,18 +197,21 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 
 			// check actual file dimensions, type, contents
 			// filetype is returned as 'image/*format*'
-			err, filetype := safeCheckContents(file)
+			err = safeCheckContents(file)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
 			// actually save image
-			err, filepath := safeSaveFile(file, filetype)
+			err, filepath := safeSaveFile(file)
 			if err != nil {
+				fmt.Printf("SAVE FAILED: %v\n", err)
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+
+			fmt.Printf("SAVED: %s\n", filepath)
 
 			submissionNode := Submission{
 				ImagePath:        filepath,
