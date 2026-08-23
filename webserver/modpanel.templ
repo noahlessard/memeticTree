@@ -1,6 +1,10 @@
 package main
 
-templ modpanel(user string) {
+import "strings"
+import "fmt"
+import "database/sql"
+
+templ modpanel(db *sql.DB, user string, submissions []Node) {
 
 <!DOCTYPE html>
 <html>
@@ -15,7 +19,87 @@ templ modpanel(user string) {
     
     <h3>Moderator Panel</h3>
     <p>Welcome, { user }.</p>
-    <p>Approve Submissions will live here.</p>
+
+    if len(submissions) > 0 {
+    <table>
+        <tr>
+            <th>Image</th>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Proposed Parent</th>
+            <th>Proposed Child</th>
+            <th>Tags</th>
+            <th>Approve</th>
+            <th>Edit</th>
+            <th>Reject</th>
+
+        </tr>
+    for _, sub := range submissions {
+        <tr>
+            {{ name := "No name provided" }}
+            if len(sub.Name) > 0 {
+                {{ name = sub.Name }}
+            }
+            {{ desc := "No description provided" }}
+            if len(sub.Description) > 0 {
+                {{ desc = sub.Description }}
+            }
+            {{ 
+                parent := "No parent provided"
+                var parentNode Node
+             }}
+            if len(sub.Parents) > 0 {
+                {{ 
+                    // TODO: make this support lists?
+                    parentNode = sub.Parents[0]
+                    parent = parentNode.Name
+                }}
+            }
+            {{ 
+                child := "No child provided"
+                var childNode Node
+             }}
+            if len(sub.Children) > 0 {
+                {{ 
+                    // TODO: make this support lists?
+                    childNode = sub.Children[0]
+                    child = childNode.Name
+                }}
+            }
+            {{ tags := "No tags provided" }}
+            // TODO: make these clickable?
+            if len(sub.Tags) > 0 {
+                {{ tags = strings.Join(sub.Tags, ", ") }}
+            }
+            
+            <td><img src={ sub.ImagePath } alt="Error! No image" height="200"></td>
+            <td>{ name }</td>
+            <td>{ desc }</td>
+        
+            if parentNode.ID != 0 {
+                <td><a href={ "/subpage?id=" + fmt.Sprint(parentNode.ID) }>{ parent }</a></td>
+            } else {
+                <td>{ parent }</td>
+            }
+
+            if childNode.ID != 0 {
+                <td><a href={ "/subpage?id=" + fmt.Sprint(childNode.ID) }>{ child }</a></td>
+            } else {
+                <td>{ child }</td>
+            }
+            
+            <td>{ tags }</td>
+            <td><a href={ "/approve?id=" + fmt.Sprint(sub.ID)}>Approve</a></td>
+            <td><a href={ "/submissionEditor?id=" + fmt.Sprint(sub.ID)}>Edit</a></td>
+            <td><a href={ "/reject?id=" + fmt.Sprint(sub.ID)}>Reject</a></td>
+
+        </tr>
+    }
+    </table>
+    } else {
+    <p>No submissions yet.</p>
+    }
+
     <a href="/logout">Log out</a>
 
     </div>

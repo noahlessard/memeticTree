@@ -113,7 +113,7 @@ func offspring(name string, text string, offspringNodes []Node) templ.Component 
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 templ.SafeURL
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs("/submission?searchType=child&nameinput=" + name)
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs("/submission?searchType=child&reference=" + name)
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `offspring.templ`, Line: 25, Col: 69}
 			}
@@ -131,7 +131,7 @@ func offspring(name string, text string, offspringNodes []Node) templ.Component 
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 templ.SafeURL
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs("/submission?searchType=parent&nameinput=" + name)
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs("/submission?searchType=parent&reference=" + name)
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `offspring.templ`, Line: 27, Col: 70}
 			}

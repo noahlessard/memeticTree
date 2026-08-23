@@ -22,9 +22,9 @@ templ offspring(name string, text string, offspringNodes []Node) {
 
 
     if strings.Contains(text, "Offspring"){
-        <p><a href={ "/submission?searchType=child&nameinput=" + name }>+Add an offspring</a></p>
+        <p><a href={ "/submission?searchType=child&reference=" + name }>+Add an offspring</a></p>
     } else {
-        <p><a href={ "/submission?searchType=parent&nameinput=" + name}>+Add a parent</a></p>
+        <p><a href={ "/submission?searchType=parent&reference=" + name}>+Add a parent</a></p>
 
     }
 

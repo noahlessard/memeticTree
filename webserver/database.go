@@ -3,15 +3,19 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
+	"os"
 	"strings"
-	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func initDatabase(db *sql.DB) error {
 
-	// TODO: I'm not sure if these not nulls are actually enforced
-	// with how go defaults things. Double check eventually
+	// sqlite enforces NOT NULL at the schema level regardless of how
+	// the driver defaults values, so no code-side guard is needed.
 	const schema = `
 	CREATE TABLE IF NOT EXISTS nodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,9 +23,7 @@ func initDatabase(db *sql.DB) error {
 	description TEXT NOT NULL UNIQUE,
 	imagepath TEXT NOT NULL UNIQUE,
     parents TEXT,
-    children TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+    children TEXT);
 	
 	
 	CREATE TABLE IF NOT EXISTS tags (
@@ -39,8 +41,16 @@ func initDatabase(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS mods (
 	id INTEGER PRIMARY KEY,
 	name TEXT NOT NULL UNIQUE,
-	hash TEXT NOT NULL UNIQUE)
-	`
+	hash TEXT NOT NULL UNIQUE);
+	
+	CREATE TABLE IF NOT EXISTS submissions (
+	id INTEGER PRIMARY KEY,
+	name TEXT,
+	description TEXT,
+	imagepath TEXT NOT NULL UNIQUE,
+	parent TEXT,
+	child TEXT,
+	potentialtags TEXT)`
 
 	_, err := db.Exec(schema)
 	return err
@@ -50,11 +60,10 @@ func initDatabase(db *sql.DB) error {
 func createnode(db *sql.DB, node Node) int {
 
 	query := `
-        INSERT INTO nodes (name, description, imagepath, parents, children, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO nodes (name, description, imagepath, parents, children)
+        VALUES (?, ?, ?, ?, ?)
     `
 
-	now := time.Now()
 	parentsJSON, _ := json.Marshal(node.Parents)
 	childrenJSON, _ := json.Marshal(node.Children)
 
@@ -64,8 +73,6 @@ func createnode(db *sql.DB, node Node) int {
 		node.ImagePath,
 		string(parentsJSON),
 		string(childrenJSON),
-		now,
-		now,
 	)
 
 	if err != nil {
@@ -101,7 +108,6 @@ func updateRelatives(db *sql.DB, node Node) {
 	if len(node.Children) > 0 {
 		for _, childNode := range node.Children {
 			// update the child nodes to have this node as its parent
-			fmt.Println(childNode)
 			updateParents(db, childNode.ID, node)
 		}
 	}
@@ -188,8 +194,6 @@ func unwrapSQLNodes(rows *sql.Rows) []Node {
 			&node.ImagePath,
 			&parentsJSON,
 			&childrenJSON,
-			&node.CreatedAt,
-			&node.UpdatedAt,
 			&tagsStr,
 		)
 
@@ -198,6 +202,7 @@ func unwrapSQLNodes(rows *sql.Rows) []Node {
 			continue
 		}
 
+		// TODO: check if these nodes actually exist?
 		if parentsJSON.Valid {
 			json.Unmarshal([]byte(parentsJSON.String), &node.Parents)
 		}
@@ -228,8 +233,6 @@ func getnode(db *sql.DB, id int) Node {
 			n.imagepath, 
 			n.parents, 
 			n.children, 
-			n.created_at, 
-			n.updated_at,
 			COALESCE(GROUP_CONCAT(t.name, ','), '') as tags
 		FROM nodes n
 		LEFT JOIN junction_node_tags nt ON n.id = nt.item_id
@@ -245,7 +248,41 @@ func getnode(db *sql.DB, id int) Node {
 	}
 	defer rows.Close()
 
-	return unwrapSQLNodes(rows)[0]
+	nodeArray := unwrapSQLNodes(rows)
+	if len(nodeArray) > 0 {
+		return nodeArray[0]
+	} else {
+		return Node{}
+	}
+}
+
+func getSubmission(db *sql.DB, id int) Node {
+	query := `
+		SELECT 
+			id, 
+			name, 
+			description, 
+			imagepath, 
+			parent, 
+			child, 
+			potentialtags
+		FROM submissions
+		WHERE id = ?
+	`
+
+	rows, err := db.Query(query, id)
+	if err != nil {
+		fmt.Println(err)
+		return Node{}
+	}
+	defer rows.Close()
+	nodeArray := unwrapSQLNodes(rows)
+	if len(nodeArray) > 0 {
+		return nodeArray[0]
+	} else {
+		return Node{}
+	}
+
 }
 
 func getnodeByName(db *sql.DB, searchTerm string) []Node {
@@ -257,8 +294,6 @@ func getnodeByName(db *sql.DB, searchTerm string) []Node {
 			n.imagepath, 
 			n.parents, 
 			n.children, 
-			n.created_at, 
-			n.updated_at,
 			GROUP_CONCAT(t.name, ',') as tags
 		FROM nodes n
 		LEFT JOIN junction_node_tags nt ON n.id = nt.item_id
@@ -269,7 +304,6 @@ func getnodeByName(db *sql.DB, searchTerm string) []Node {
 	`
 
 	// get all rows that possibly match query
-	// need the odd string building for the LIKE keyword
 	rows, err := db.Query(query, "%"+searchTerm+"%")
 	if err != nil {
 		fmt.Println(err)
@@ -279,6 +313,44 @@ func getnodeByName(db *sql.DB, searchTerm string) []Node {
 	defer rows.Close()
 
 	return unwrapSQLNodes(rows)
+}
+
+// check if you got an empty node by checking if ID == 0 (un-init)
+func getnodeByNameExact(db *sql.DB, searchTerm string) Node {
+	query := `
+		SELECT 
+			n.id, 
+			n.name, 
+			n.description, 
+			n.imagepath, 
+			n.parents, 
+			n.children, 
+			GROUP_CONCAT(t.name, ',') as tags
+		FROM nodes n
+		LEFT JOIN junction_node_tags nt ON n.id = nt.item_id
+		LEFT JOIN tags t ON nt.tag_id = t.id
+		WHERE n.name = ?
+		GROUP BY n.id
+		ORDER BY n.name
+	`
+
+	// get the node that exactly matches
+	rows, err := db.Query(query, searchTerm)
+	if err != nil {
+		fmt.Println(err)
+		return Node{}
+	}
+
+	defer rows.Close()
+
+	rowsArray := unwrapSQLNodes(rows)
+	// if there is more than one node, return nothing (how did this even happen?)
+	if len(rowsArray) != 1 {
+		return Node{}
+	} else {
+		return rowsArray[0]
+	}
+
 }
 
 func getnodeByTags(db *sql.DB, tags []string) []Node {
@@ -292,8 +364,6 @@ func getnodeByTags(db *sql.DB, tags []string) []Node {
 			i.imagepath, 
 			i.parents, 
 			i.children, 
-			i.created_at, 
-			i.updated_at,
 			COALESCE(GROUP_CONCAT(t.name, ','), '') as tags
 		FROM nodes i
 		JOIN junction_node_tags it ON i.id = it.item_id
@@ -376,5 +446,129 @@ func removeTagsFromNode(db *sql.DB, nodeID int, tags []string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// CreateUser upserts a moderator, storing a bcrypt hash of the password.
+// INSERT OR REPLACE keeps re-seeding idempotent so env changes apply.
+func CreateUser(db *sql.DB, name, password string) error {
+	if name == "" || password == "" {
+		return errors.New("Error: username and password can't be blank")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec(`INSERT INTO mods (name, hash) VALUES (?, ?)`, name, string(hash))
+	return err
+}
+
+func isMod(db *sql.DB, name, password string) bool {
+	var hash string
+	err := db.QueryRow(`SELECT hash FROM mods WHERE name = ?`, name).Scan(&hash)
+	if err != nil {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+func insertSubmission(db *sql.DB, inputSubmission Node) error {
+
+	// check that submission atleast has an image path (everything else can be empty)
+	if len(inputSubmission.ImagePath) <= 0 {
+		return errors.New("image path cannot be null when submitting")
+	}
+
+	// can't store tags as array, so use comma sep string
+	// we will unmarshall and insert tags in the moderation accept code
+	var tagString string
+	if len(inputSubmission.Tags) > 0 {
+		tagString = strings.Join(inputSubmission.Tags, ", ")
+	}
+
+	parentsJSON, _ := json.Marshal(inputSubmission.Parents)
+	childrenJSON, _ := json.Marshal(inputSubmission.Children)
+
+	_, err := db.Exec(`INSERT INTO submissions (name, description, imagepath, parent, child, potentialtags) VALUES (?, ?, ?, ?, ?, ?)`,
+		inputSubmission.Name,
+		inputSubmission.Description,
+		inputSubmission.ImagePath,
+		string(parentsJSON),
+		string(childrenJSON),
+		tagString)
+
+	if err != nil {
+		return errors.New("Error: unable to insert submission into database")
+	}
+
+	return nil
+
+}
+
+func getSubmissions(db *sql.DB, offset int, pageSize int) []Node {
+	query := `
+		SELECT id, name, description, imagepath, parent, child, potentialtags
+		FROM submissions
+		ORDER BY id
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := db.Query(query, pageSize, offset)
+	if err != nil {
+		return []Node{}
+	}
+	defer rows.Close()
+
+	return unwrapSQLNodes(rows)
+}
+
+func removeSubmission(db *sql.DB, submissionNode Node) error {
+
+	fileName, found := strings.CutPrefix(submissionNode.ImagePath, "/assets/")
+
+	// if the image path passed in had assets, change to ../uploads
+	if found == true {
+		fileName = "../uploads/" + fileName
+	} else {
+		// it was called already with ../uploads, so its fine
+	}
+
+	err := os.Remove(fileName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	query := `
+		DELETE FROM submissions WHERE id = ?
+	`
+	_, err = db.Exec(query, submissionNode.ID)
+
+	if err != nil {
+		return err
+	} else {
+		return nil
+	}
+
+}
+
+func moveSubmissionToNodes(db *sql.DB, submissionNode Node) error {
+
+	// first move image from uploads to assets
+	bytesRead, err := os.ReadFile(submissionNode.ImagePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fileName, _ := strings.CutPrefix(submissionNode.ImagePath, "../uploads/")
+	err = os.WriteFile("./assets/"+fileName, bytesRead, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// save this under slightly different path for http handling
+	submissionNode.ImagePath = "/assets/" + fileName
+	createnode(db, submissionNode)
+
+	removeSubmission(db, submissionNode)
+
 	return nil
 }

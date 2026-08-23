@@ -8,7 +8,7 @@ package main
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func submission(selectedString string, selectedTags string, selectedType string, status bool) templ.Component {
+func submission(selectedName string, selectedDescription string, selectedTags string, selectedType string, selectedReference string, status bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,20 +49,20 @@ func submission(selectedString string, selectedTags string, selectedType string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h3>Submissions:</h3><form method=\"POST\" enctype=\"multipart/form-data\"><p>Thank you for taking the time to submit a meme to this archive. You don't need an account to submit, but if you would like to track your contributions or have them count towards becoming a moderator, consider creating an account first.</p><p>You can reference an existing node in the archive by putting its name here: </p><input type=\"text\" name=\"nameinput\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<h3>Submissions:</h3><form method=\"POST\" enctype=\"multipart/form-data\"><p>Thank you for taking the time to submit a meme to this archive. You don't need an account to submit, but if you would like to track your contributions or have them count towards becoming a moderator, consider creating an account first.</p><p>You can reference an existing node in the archive by putting its name here: </p><input type=\"text\" name=\"reference\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(selectedString)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(selectedReference)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `submission.templ`, Line: 22, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `submission.templ`, Line: 22, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"> <select name=\"searchType\"><option value=\"none\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" placeholder=\"Referenced node's name\"> <select name=\"searchType\"><option value=\"none\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -92,12 +92,12 @@ func submission(selectedString string, selectedTags string, selectedType string,
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, ">Link to the existing node as a new child</option></select><p>Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags should be adjectives / categories that aren't memes themselves. Good tag examples include: \"notext\" , \"video game\", \"twitter\", \"programming.\" </p><input type=\"text\" name=\"tagsinput\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, ">Link to the existing node as a new child</option></select><p>Please consider providing a name and description for your submission. Description examples can be seen by browsing the tree. You do not need to add LUCA: in front of the name, these will get added dynamically.</p><input type=\"text\" name=\"nameinput\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(selectedTags)
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(selectedName)
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `submission.templ`, Line: 30, Col: 59}
 		}
@@ -105,17 +105,43 @@ func submission(selectedString string, selectedTags string, selectedType string,
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p><input type=\"file\" id=\"image\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required> <button type=\"submit\">Upload all info</button></form><script>\n        document.getElementById(\"image\").form.onsubmit = function () {\n            var f = document.getElementById(\"image\").files[0];\n            if (f && f.size > 2097152) {\n                alert(\"File too large, must be under 2MB\");\n                return false;\n            }\n            return true;\n        };\n    </script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" placeholder=\"Name\"> <input type=\"text\" name=\"descriptioninput\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(selectedDescription)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `submission.templ`, Line: 31, Col: 73}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" placeholder=\"Description\"><p>Please consider tagging your image, so that we can better collate it to existing memes. Tags must be comma separated. Tags should be adjectives / categories that aren't memes themselves. Good tag examples include: \"notext\" , \"video game\", \"twitter\", \"programming.\" </p><input type=\"text\" name=\"tagsinput\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(selectedTags)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `submission.templ`, Line: 34, Col: 59}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" placeholder=\"Tags\"><p>We currently accept jpg/jpeg, png, and webp images. Please limit file size to &lt; 2 MB</p><input type=\"file\" id=\"image\" name=\"image\" accept=\"image/jpeg,image/png,image/webp\" required> <button type=\"submit\">Upload all info</button></form><script>\n        document.getElementById(\"image\").form.onsubmit = function () {\n            var f = document.getElementById(\"image\").files[0];\n            if (f && f.size > 2097152) {\n                alert(\"File too large, must be under 2MB\");\n                return false;\n            }\n            return true;\n        };\n    </script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if status == true {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<p>Successfully submitted!</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<p>Successfully submitted!</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

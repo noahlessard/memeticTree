@@ -2,13 +2,9 @@ package main
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
-	"errors"
 	"net/http"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -16,29 +12,6 @@ const (
 	csrfName    = "mod_csrf"
 	sessionTTL  = 8 * time.Hour
 )
-
-// CreateUser upserts a moderator, storing a bcrypt hash of the password.
-// INSERT OR REPLACE keeps re-seeding idempotent so env changes apply.
-func CreateUser(db *sql.DB, name, password string) error {
-	if name == "" || password == "" {
-		return errors.New("Error: username and password can't be blank")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	_, err = db.Exec(`INSERT INTO mods (name, hash) VALUES (?, ?)`, name, string(hash))
-	return err
-}
-
-func isMod(db *sql.DB, name, password string) bool {
-	var hash string
-	err := db.QueryRow(`SELECT hash FROM mods WHERE name = ?`, name).Scan(&hash)
-	if err != nil {
-		return false
-	}
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
-}
 
 // current sessions are stored here
 var sessions = map[string]modSession{}

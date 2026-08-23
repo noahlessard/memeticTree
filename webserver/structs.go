@@ -1,7 +1,5 @@
 package main
 
-import "time"
-
 type Node struct {
 	ID          int
 	Name        string
@@ -10,13 +8,4 @@ type Node struct {
 	Parents     []Node
 	Children    []Node
 	Tags        []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-}
-
-type Submission struct {
-	Name             string
-	ImagePath        string
-	RelationshipType string
-	PotentialTags    []string
 }

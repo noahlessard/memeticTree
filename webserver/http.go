@@ -27,10 +27,11 @@ var allowedSearches = [3]string{"none", "parent", "child"}
 
 func startWebserver(db *sql.DB) {
 
-	// serve the images from disk for now
-	assetsDir := http.Dir(".")
-	fs := http.FileServer(assetsDir)
-	http.Handle("/assets/", fs)
+	assetsFs := http.FileServer(http.Dir("assets"))
+	http.Handle("/assets/", http.StripPrefix("/assets/", assetsFs))
+
+	uploadsFs := http.FileServer(http.Dir("../uploads"))
+	http.Handle("/uploads/", http.StripPrefix("/uploads/", uploadsFs))
 
 	// serve html from templ
 	http.Handle("/", templ.Handler(homepage(db)))
@@ -43,7 +44,9 @@ func startWebserver(db *sql.DB) {
 	http.HandleFunc("/random", makeRandompageHandler(db))
 	http.HandleFunc("/login", makeHandleLogin(db))
 	http.HandleFunc("/logout", makeHandleLogout())
-	http.HandleFunc("/moderator", requireAuth(makeModeration()))
+	http.HandleFunc("/moderator", requireAuth(makeModeration(db)))
+	http.HandleFunc("/approve", requireAuth(handleApproval(db, true)))
+	http.HandleFunc("/reject", requireAuth(handleApproval(db, false)))
 
 	fmt.Println("Listening on :3000")
 	http.ListenAndServe(":3000", nil)
@@ -55,7 +58,7 @@ func makeSubpageHandler(db *sql.DB) http.HandlerFunc {
 
 		nodeIDStr := r.URL.Query().Get("id")
 		nodeID, err := strconv.Atoi(nodeIDStr)
-		if err != nil {
+		if err != nil || nodeID == 0 {
 			http.Error(w, "Invalid node ID", http.StatusBadRequest)
 			return
 		}
@@ -167,37 +170,45 @@ func makeHandleLogout() http.HandlerFunc {
 // requiring this signature means a handler can't be registered without requireAuth!
 type authedHandler func(w http.ResponseWriter, r *http.Request, session modSession)
 
-func makeModeration() authedHandler {
+func makeModeration(db *sql.DB) authedHandler {
 	return func(w http.ResponseWriter, r *http.Request, session modSession) {
-		templ.Handler(modpanel(session.user)).ServeHTTP(w, r)
+		submissions := getSubmissions(db, 0, 100)
+		templ.Handler(modpanel(db, session.user, submissions)).ServeHTTP(w, r)
 	}
 }
 
 func handleSubmission(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var selectedString string
-		var selectedTagString string
-		var selectedType string
+
 		// set this to true when we submit okay
 		status := false
 
-		// always get this items regardless
-		selectedString = strings.TrimSpace(r.FormValue("nameinput"))
-		if selectedString == "" {
-			selectedString = r.URL.Query().Get("nameinput")
+		// this is used to name this submission
+		selectedName := strings.TrimSpace(r.FormValue("nameinput"))
+		if selectedName == "" {
+			selectedName = r.URL.Query().Get("nameinput")
+		}
+		selectedDescription := strings.TrimSpace(r.FormValue("descriptioninput"))
+		if selectedDescription == "" {
+			selectedDescription = r.URL.Query().Get("descriptioninput")
 		}
 		// can be none, parent, or child (see above consts)
-		selectedType = strings.TrimSpace(r.FormValue("searchType"))
+		selectedType := strings.TrimSpace(r.FormValue("searchType"))
 		if selectedType == "" {
 			selectedType = r.URL.Query().Get("searchType")
 		}
-		selectedTagString = strings.TrimSpace(r.FormValue("tagsinput"))
+		// this is used to enter the name of referenced node (parent / child / none)
+		selectedReference := strings.TrimSpace(r.FormValue("reference"))
+		if selectedReference == "" {
+			selectedReference = r.URL.Query().Get("reference")
+		}
+		selectedTagString := strings.TrimSpace(r.FormValue("tagsinput"))
 		if selectedTagString == "" {
 			selectedTagString = r.URL.Query().Get("tagsinput")
 		}
 
 		if r.Method == "GET" {
-			templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
+			templ.Handler(submission(selectedName, selectedDescription, selectedTagString, selectedType, selectedReference, status)).ServeHTTP(w, r)
 			return
 		} else if r.Method == "POST" {
 
@@ -209,8 +220,8 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 				return
 			}
 
-			// validate strings
-			cleanTags, err := returnCleanSubmissionFields(selectedString, selectedTagString, selectedType)
+			// validate strings, looking up name as well to verify it matches
+			cleanTags, err := returnCleanSubmissionFields(db, selectedName, selectedTagString, selectedType)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -254,18 +265,42 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 				return
 			}
 
-			submissionNode := Submission{
-				ImagePath:        filepath,
-				RelationshipType: selectedType,
-				PotentialTags:    cleanTags,
+			// don't set ID here, database code handles it
+			submissionNode := Node{
+				Name:        selectedName,
+				Description: selectedDescription,
+				ImagePath:   filepath,
+				Tags:        cleanTags,
 			}
 
-			// TODO: Create the node in the submission db table
-			// check sql injection stuff
-			fmt.Println(submissionNode)
+			// check that reference node exists, then add it to parent or child field
+			if len(selectedReference) > 0 {
+				referencedNode := getnodeByNameExact(db, selectedReference)
+				if referencedNode.ID == 0 {
+					http.Error(w, "Error: can't find reference node. Match must be exact", http.StatusBadRequest)
+					return
+				}
+				if selectedType == "child" {
+					submissionNode.Parents = []Node{referencedNode}
+				} else if selectedType == "parent" {
+					submissionNode.Children = []Node{referencedNode}
+				} else if selectedType == "none" {
+					http.Error(w, "Error: can't include a reference without specifying type", http.StatusBadRequest)
+					return
+				}
+			}
+
+			// insertSubmission uses parameterized queries, so no injection risk here
+			err = insertSubmission(db, submissionNode)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 			status = true
 
-			templ.Handler(submission(selectedString, selectedTagString, selectedType, status)).ServeHTTP(w, r)
+			// clear tags when submission is successful
+			templ.Handler(submission("", "", "", "", "", status)).ServeHTTP(w, r)
 			return
 		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -277,7 +312,7 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 // putting some extra parsing code here... maybe overkill
 // will return the tags field as an array instead of just a string
 // these don't need to check the size bc go already limit get size reasonably
-func returnCleanSubmissionFields(name string, tags string, searchtype string) ([]string, error) {
+func returnCleanSubmissionFields(db *sql.DB, name string, tags string, searchtype string) ([]string, error) {
 
 	// check tag size
 	tagSplit := strings.Split(tags, ",")
@@ -290,13 +325,6 @@ func returnCleanSubmissionFields(name string, tags string, searchtype string) ([
 		return []string{}, errors.New("Error: no valid search type submitted")
 	}
 
-	// check name actually exists
-	// enforce exact name
-	// SQL inject?
-	//if len(getnodeByName(name)) != 1 {
-	//	return []string{}, errors.new("Error: could not find node with that name. Match must be exact!")
-	//}
-
 	// build and return tag array
 	tagsArr := make([]string, len(tagSplit))
 	for i, tag := range tagSplit {
@@ -305,6 +333,30 @@ func returnCleanSubmissionFields(name string, tags string, searchtype string) ([
 
 	return tagsArr, nil
 
+}
+
+func handleApproval(db *sql.DB, status bool) authedHandler {
+	return func(w http.ResponseWriter, r *http.Request, session modSession) {
+		selectedSubmisisonString := r.URL.Query().Get("id")
+		selectedSubmisison, _ := strconv.Atoi(selectedSubmisisonString)
+		submissionNode := getSubmission(db, selectedSubmisison)
+		if submissionNode.ID == 0 {
+			http.Error(w, "Error: Could not find that submission to approve", http.StatusBadRequest)
+			return
+		}
+		if status == true {
+			// run database function to move submission from sub table to
+			moveSubmissionToNodes(db, submissionNode)
+		} else {
+			removeSubmission(db, submissionNode)
+		}
+
+		// then recall the makeModeration function?
+		// don't know how to do this directly... so i'm just redoing the code here bleh
+		submissions := getSubmissions(db, 0, 100)
+		templ.Handler(modpanel(db, session.user, submissions)).ServeHTTP(w, r)
+
+	}
 }
 
 // wrap our http handler functions with this to require a csrf

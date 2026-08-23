@@ -32,7 +32,7 @@ templ search(results []Node, selectedType string, searchQuery string) {
         <h2>Results:</h2>
         <ul>
             for _, node := range results {
-                <li>{ node.Name }, { node.Description }, { node.CreatedAt.Format(layout) }</li>
+                <li>{ node.Name }, { node.Description }</li>
             }
         </ul>
     }

@@ -1,4 +1,5 @@
 .DS_Store
 webserver/app.db
 uploads/
+*.avif
 webserver/passwords.txt
