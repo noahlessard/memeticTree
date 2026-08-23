@@ -57,6 +57,8 @@ func initDatabase(db *sql.DB) error {
 
 }
 
+// given a node struct, insert it into the database
+// return the id of the new row the node now lives in
 func createnode(db *sql.DB, node Node) int {
 
 	query := `
@@ -123,19 +125,17 @@ func updateRelatives(db *sql.DB, node Node) {
 
 func updateParents(db *sql.DB, changedNode int, newNode Node) error {
 
-	// Get the changing node, so we can make sure its not duped
 	changedNodeDB := getnode(db, changedNode)
 
+	// this is a rare case, so just throw error instead of trying to work around
 	for _, p := range changedNodeDB.Parents {
 		if p.ID == newNode.ID {
-			return nil
+			return errors.New("Error: duplicate in parents detected, aborting...")
 		}
 	}
 
-	// Add the parent
 	changedNodeDB.Parents = append(changedNodeDB.Parents, newNode)
 
-	// Marshal back to JSON and update database
 	newJson, err := json.Marshal(changedNodeDB.Parents)
 	if err != nil {
 		return err
@@ -150,20 +150,17 @@ func updateParents(db *sql.DB, changedNode int, newNode Node) error {
 }
 
 func updateChildren(db *sql.DB, changedNode int, newNode Node) error {
-	// Get the changing node, so we can make sure its not duped
 	changedNodeDB := getnode(db, changedNode)
 
-	// Check if child already exists to avoid duplicates
+	// this is a rare case, so just throw error instead of trying to work around
 	for _, c := range changedNodeDB.Children {
 		if c.ID == newNode.ID {
-			return nil
+			return errors.New("Error: duplicate in children detected, aborting...")
 		}
 	}
 
-	// Add the child
 	changedNodeDB.Children = append(changedNodeDB.Children, newNode)
 
-	// Marshal back to JSON and update database
 	childrenJSON, err := json.Marshal(changedNodeDB.Children)
 	if err != nil {
 		return err
@@ -177,6 +174,8 @@ func updateChildren(db *sql.DB, changedNode int, newNode Node) error {
 	return err
 }
 
+// given an array of rows from a node format table, return a list of node objects.
+// does not check anything about results, does not close rows
 func unwrapSQLNodes(rows *sql.Rows) []Node {
 
 	// put all the results into node array
@@ -224,6 +223,8 @@ func unwrapSQLNodes(rows *sql.Rows) []Node {
 
 }
 
+// return a node based on given ID.
+// returns an empty node if not found, with ID init to 0
 func getnode(db *sql.DB, id int) Node {
 	query := `
 		SELECT 
@@ -256,6 +257,8 @@ func getnode(db *sql.DB, id int) Node {
 	}
 }
 
+// return a submission based on given ID.
+// returns an empty submission if not found, with ID init to 0
 func getSubmission(db *sql.DB, id int) Node {
 	query := `
 		SELECT 
@@ -285,6 +288,8 @@ func getSubmission(db *sql.DB, id int) Node {
 
 }
 
+// return an array of nodes that are LIKE the name given.
+// returns an empty array if none are found
 func getnodeByName(db *sql.DB, searchTerm string) []Node {
 	query := `
 		SELECT 
@@ -315,7 +320,8 @@ func getnodeByName(db *sql.DB, searchTerm string) []Node {
 	return unwrapSQLNodes(rows)
 }
 
-// check if you got an empty node by checking if ID == 0 (un-init)
+// return a single node based on matching the name exactly.
+// returns an empty node if not found, with ID init to 0
 func getnodeByNameExact(db *sql.DB, searchTerm string) Node {
 	query := `
 		SELECT 
@@ -353,6 +359,8 @@ func getnodeByNameExact(db *sql.DB, searchTerm string) Node {
 
 }
 
+// return an array of nodes, with each node needing to have ANY of the tags given in it's tags.
+// if none are found, an empty array is returned
 func getnodeByTags(db *sql.DB, tags []string) []Node {
 	placeholders := strings.Repeat("?,", len(tags)-1) + "?"
 
@@ -405,20 +413,17 @@ func countNodes(db *sql.DB) int {
 
 func addTagsToNode(db *sql.DB, nodeID int, tags []string) error {
 	for _, tagName := range tags {
-		// Insert tag if it doesn't exist
 		_, err := db.Exec("INSERT OR IGNORE INTO tags (name) VALUES (?)", tagName)
 		if err != nil {
 			return err
 		}
 
-		// Get the tag ID
 		var tagID int
 		err = db.QueryRow("SELECT id FROM tags WHERE name = ?", tagName).Scan(&tagID)
 		if err != nil {
 			return err
 		}
 
-		// Insert into junction table (ignore if already linked)
 		_, err = db.Exec(
 			"INSERT OR IGNORE INTO junction_node_tags (item_id, tag_id) VALUES (?, ?)",
 			nodeID, tagID,
@@ -449,6 +454,8 @@ func removeTagsFromNode(db *sql.DB, nodeID int, tags []string) error {
 	return nil
 }
 
+// given a node, updated it's entry in the node table.
+// all fields will be updated.
 func updateNode(db *sql.DB, node Node) error {
 
 	parentsJSON, _ := json.Marshal(node.Parents)
@@ -473,6 +480,8 @@ func updateNode(db *sql.DB, node Node) error {
 	return addTagsToNode(db, node.ID, node.Tags)
 }
 
+// given a node, updated it's entry in the submission table.
+// all fields will be updated.
 func updateSubmission(db *sql.DB, node Node) error {
 
 	parentsJSON, _ := json.Marshal(node.Parents)
@@ -495,9 +504,13 @@ func updateSubmission(db *sql.DB, node Node) error {
 	return err
 }
 
-// CreateUser upserts a moderator, storing a bcrypt hash of the password.
-// INSERT OR REPLACE keeps re-seeding idempotent so env changes apply.
+// inserts an account in the moderator table.
+// handles hashing internally.
+// name and password must not be empty, handles stripping internally
 func CreateUser(db *sql.DB, name, password string) error {
+	name = strings.TrimSpace(name)
+	password = strings.TrimSpace(password)
+
 	if name == "" || password == "" {
 		return errors.New("Error: username and password can't be blank")
 	}
@@ -509,6 +522,7 @@ func CreateUser(db *sql.DB, name, password string) error {
 	return err
 }
 
+// check if name and password exists in moderator table
 func isMod(db *sql.DB, name, password string) bool {
 	var hash string
 	err := db.QueryRow(`SELECT hash FROM mods WHERE name = ?`, name).Scan(&hash)
@@ -518,9 +532,10 @@ func isMod(db *sql.DB, name, password string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
+// given a node, create a new entry in the submission table.
+// image path MUST be set, everything else can be empty
 func insertSubmission(db *sql.DB, inputSubmission Node) error {
 
-	// check that submission atleast has an image path (everything else can be empty)
 	if len(inputSubmission.ImagePath) <= 0 {
 		return errors.New("image path cannot be null when submitting")
 	}
@@ -568,6 +583,8 @@ func getSubmissions(db *sql.DB, offset int, pageSize int) []Node {
 	return unwrapSQLNodes(rows)
 }
 
+// given a node, attempt to remove it from the database.
+// also, remove the image from the uploads/ directory.
 func removeSubmission(db *sql.DB, submissionNode Node) error {
 
 	fileName, found := strings.CutPrefix(submissionNode.ImagePath, "/assets/")
@@ -597,6 +614,8 @@ func removeSubmission(db *sql.DB, submissionNode Node) error {
 
 }
 
+// given a node, attempt to move it from the 'submission' table to the 'node' table
+// also attempt to move the image from /uploads to /assests
 func moveSubmissionToNodes(db *sql.DB, submissionNode Node) error {
 
 	// first move image from uploads to assets
