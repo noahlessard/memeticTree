@@ -280,9 +280,9 @@ func modpanel(db *sql.DB, user string, submissions []Node) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var14 templ.SafeURL
-				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs("/submissionEditor?id=" + fmt.Sprint(sub.ID))
+				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs("/editsubmission?id=" + fmt.Sprint(sub.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modpanel.templ`, Line: 93, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modpanel.templ`, Line: 93, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {

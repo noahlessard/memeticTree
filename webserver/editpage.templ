@@ -1,22 +1,6 @@
 package main
 
-import "fmt"
-
-// add the LUCA dynamically
-func getNodeName(node Node) string {
-	nameString := node.Name
-	if len(node.Parents) == 0 {
-		nameString = "LUCA: " + nameString
-	}
-	return nameString
-}
-
-// build the search query string dynamically
-func buildTagString(tagInput string) string {
-    return "/search?query=" + tagInput + "&searchType=tags" 
-}
-
-templ subpage(node Node, modBool bool) {
+templ editpage(node Node) {
 
 <!DOCTYPE html>
 <html>
@@ -30,11 +14,8 @@ templ subpage(node Node, modBool bool) {
     
     @links()
 
+    <h3> EDITOR VIEW: </h3>
     <h3> { getNodeName(node) }</h3>
-
-    if modBool {
-        <a href={"/editpage?id=" + fmt.Sprint(node.ID)}>Edit this node</a><br>
-    }
 
     <div class="border">
 
@@ -44,16 +25,23 @@ templ subpage(node Node, modBool bool) {
         <img src={ node.ImagePath } class="tree-img">
 
         <div>
+         <form method="POST">
+         <p> <b>Name:</b> <br>
+             <input type="text" name="name" value={ node.Name }>
+         </p>
+
          <p> <b>Description:</b> <br>
-             { node.Description }
+             <textarea name="description" rows="4" cols="50">{ node.Description }</textarea>
          </p>
 
          <p> <b>Tags:</b> <br>
             for _, tag := range node.Tags {
                 <a href={ buildTagString(tag) }>>{ tag }</a><br>
             }
-            <a href="">+Add tags here</a>
          </p>
+
+         <button type="submit">Save changes</button>
+         </form>
          </div>
 
     </div>

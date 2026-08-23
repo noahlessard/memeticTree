@@ -90,7 +90,7 @@ templ modpanel(db *sql.DB, user string, submissions []Node) {
             
             <td>{ tags }</td>
             <td><a href={ "/approve?id=" + fmt.Sprint(sub.ID)}>Approve</a></td>
-            <td><a href={ "/submissionEditor?id=" + fmt.Sprint(sub.ID)}>Edit</a></td>
+            <td><a href={ "/editsubmission?id=" + fmt.Sprint(sub.ID)}>Edit</a></td>
             <td><a href={ "/reject?id=" + fmt.Sprint(sub.ID)}>Reject</a></td>
 
         </tr>

@@ -39,6 +39,8 @@ func startWebserver(db *sql.DB) {
 
 	// server html from our custom functions
 	http.HandleFunc("/subpage", makeSubpageHandler(db))
+	http.HandleFunc("/editpage", requireAuth(makeEditpageHandler(db, false)))
+	http.HandleFunc("/editsubmission", requireAuth(makeEditpageHandler(db, true)))
 	http.HandleFunc("/submission", handleSubmission(db))
 	http.HandleFunc("/search", makeHandleSearch(db))
 	http.HandleFunc("/random", makeRandompageHandler(db))
@@ -65,7 +67,53 @@ func makeSubpageHandler(db *sql.DB) http.HandlerFunc {
 
 		node := getnode(db, nodeID)
 
-		templ.Handler(subpage(node)).ServeHTTP(w, r)
+		_, modBool := checkSession(r)
+		templ.Handler(subpage(node, modBool)).ServeHTTP(w, r)
+	}
+}
+
+func makeEditpageHandler(db *sql.DB, submissionBool bool) authedHandler {
+	return func(w http.ResponseWriter, r *http.Request, session modSession) {
+
+		nodeIDStr := r.URL.Query().Get("id")
+		nodeID, err := strconv.Atoi(nodeIDStr)
+		if err != nil || nodeID == 0 {
+			http.Error(w, "Invalid node ID", http.StatusBadRequest)
+			return
+		}
+
+		var node Node
+		if submissionBool == true {
+			node = getSubmission(db, nodeID)
+		} else {
+			node = getnode(db, nodeID)
+		}
+
+		if r.Method == http.MethodPost {
+			selectedName := strings.TrimSpace(r.FormValue("name"))
+			selectedDescription := strings.TrimSpace(r.FormValue("description"))
+
+			node.Name = selectedName
+			node.Description = selectedDescription
+
+			if submissionBool {
+				err = updateSubmission(db, node)
+			} else {
+				err = updateNode(db, node)
+			}
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if submissionBool {
+				http.Redirect(w, r, "/moderator", http.StatusSeeOther)
+			} else {
+				http.Redirect(w, r, "/subpage?id="+fmt.Sprint(nodeID), http.StatusSeeOther)
+			}
+			return
+		}
+
+		templ.Handler(editpage(node)).ServeHTTP(w, r)
 	}
 }
 
@@ -75,7 +123,9 @@ func makeRandompageHandler(db *sql.DB) http.HandlerFunc {
 		var max = countNodes(db)
 		var randomNode = rand.Intn(max-min+1) + min
 		node := getnode(db, randomNode)
-		templ.Handler(subpage(node)).ServeHTTP(w, r)
+
+		_, modBool := checkSession(r)
+		templ.Handler(subpage(node, modBool)).ServeHTTP(w, r)
 	}
 }
 
@@ -99,6 +149,7 @@ func makeHandleSearch(db *sql.DB) http.HandlerFunc {
 		}
 
 		// if search query exists, search for results
+		// TODO: actually make this work
 		if searchQuery != "" {
 			if searchType == "name" {
 				results = getnodeByName(db, searchQuery)
@@ -351,11 +402,8 @@ func handleApproval(db *sql.DB, status bool) authedHandler {
 			removeSubmission(db, submissionNode)
 		}
 
-		// then recall the makeModeration function?
-		// don't know how to do this directly... so i'm just redoing the code here bleh
-		submissions := getSubmissions(db, 0, 100)
-		templ.Handler(modpanel(db, session.user, submissions)).ServeHTTP(w, r)
-
+		// then recall the makeModeration function
+		http.Redirect(w, r, "/moderator", http.StatusSeeOther)
 	}
 }
 

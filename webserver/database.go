@@ -449,6 +449,52 @@ func removeTagsFromNode(db *sql.DB, nodeID int, tags []string) error {
 	return nil
 }
 
+func updateNode(db *sql.DB, node Node) error {
+
+	parentsJSON, _ := json.Marshal(node.Parents)
+	childrenJSON, _ := json.Marshal(node.Children)
+
+	_, err := db.Exec(`UPDATE nodes SET name = ?, description = ?, imagepath = ?, parents = ?, children = ? WHERE id = ?`,
+		node.Name,
+		node.Description,
+		node.ImagePath,
+		string(parentsJSON),
+		string(childrenJSON),
+		node.ID)
+	if err != nil {
+		return err
+	}
+
+	// replace the tag links with the input node's tags
+	_, err = db.Exec("DELETE FROM junction_node_tags WHERE item_id = ?", node.ID)
+	if err != nil {
+		return err
+	}
+	return addTagsToNode(db, node.ID, node.Tags)
+}
+
+func updateSubmission(db *sql.DB, node Node) error {
+
+	parentsJSON, _ := json.Marshal(node.Parents)
+	childrenJSON, _ := json.Marshal(node.Children)
+
+	// tags are stored as a comma-joined string in the submissions table
+	var tagString string
+	if len(node.Tags) > 0 {
+		tagString = strings.Join(node.Tags, ", ")
+	}
+
+	_, err := db.Exec(`UPDATE submissions SET name = ?, description = ?, imagepath = ?, parent = ?, child = ?, potentialtags = ? WHERE id = ?`,
+		node.Name,
+		node.Description,
+		node.ImagePath,
+		string(parentsJSON),
+		string(childrenJSON),
+		tagString,
+		node.ID)
+	return err
+}
+
 // CreateUser upserts a moderator, storing a bcrypt hash of the password.
 // INSERT OR REPLACE keeps re-seeding idempotent so env changes apply.
 func CreateUser(db *sql.DB, name, password string) error {
