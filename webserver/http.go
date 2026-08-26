@@ -150,6 +150,7 @@ func makeHandleSearch(db *sql.DB) http.HandlerFunc {
 
 		// if search query exists, search for results
 		// TODO: actually make this work
+		// TODO: add a pagination here?
 		if searchQuery != "" {
 			if searchType == "name" {
 				results = getnodeByName(db, searchQuery)

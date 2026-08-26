@@ -30,11 +30,7 @@ templ search(results []Node, selectedType string, searchQuery string) {
 
     if len(results) > 0 {
         <h2>Results:</h2>
-        <ul>
-            for _, node := range results {
-                <li>{ node.Name }, { node.Description }</li>
-            }
-        </ul>
+        @node_table(results)
     }
 
 </div>

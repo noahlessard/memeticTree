@@ -1,0 +1,55 @@
+package main
+
+import "fmt"
+
+templ node_table(results []Node) {
+
+<table>
+    <tr>
+        <th>Image</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Parents</th>
+        <th>Children</th>
+        <th>Tags</th>
+    </tr>
+    for _, node := range results {
+        <tr>
+            <td><img src={ node.ImagePath } alt="Error! No image" height="200"></td>
+            <td><a href={ "/subpage?id=" + fmt.Sprint(node.ID) }>{ node.Name }</a></td>
+            <td>{ node.Description }</td>
+            <td>
+                if len(node.Parents) == 0 {
+                    <p>None</p>
+                }
+                for i, parent := range node.Parents {
+                    <a href={ "/subpage?id=" + fmt.Sprint(parent.ID) }>{ parent.Name }</a>
+                    if i < len(node.Parents)-1 {
+                        <span>, </span>
+                    }
+                }
+            </td>
+            <td>
+                if len(node.Children) == 0 {
+                    <p>None</p>
+                }
+                for i, child := range node.Children {
+                    <a href={ "/subpage?id=" + fmt.Sprint(child.ID) }>{ child.Name }</a>
+                    if i < len(node.Children)-1 {
+                        <span>, </span>
+                    }
+                }
+            </td>
+            <td>
+                for i, tag := range node.Tags {
+                    <a href={ buildTagString(tag) }>{ tag }</a>
+                    if i < len(node.Tags)-1 {
+                        <span>, </span>
+                    }
+                }
+            </td>
+        </tr>
+    }
+</table>
+
+}
