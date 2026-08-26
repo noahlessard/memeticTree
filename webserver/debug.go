@@ -36,7 +36,7 @@ func seedDB(db *sql.DB) {
 		fmt.Printf("Creating user: %s\n", scanner.Text())
 		// parse out user / password
 		array := strings.Split(scanner.Text(), ",")
-		if err := CreateUser(db, strings.TrimSpace(array[0]), strings.TrimSpace(array[1])); err != nil {
+		if err := CreateUser(db, array[0], array[1]); err != nil {
 			fmt.Printf("couldn't seed moderator %s: %s\n", array[0], err)
 		}
 	}
