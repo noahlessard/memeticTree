@@ -44,6 +44,7 @@ func startWebserver(db *sql.DB) {
 	http.HandleFunc("/submission", handleSubmission(db))
 	http.HandleFunc("/search", makeHandleSearch(db))
 	http.HandleFunc("/random", makeRandompageHandler(db))
+	http.HandleFunc("/randomvisual", makeHandleRandomVisual(db))
 	http.HandleFunc("/login", makeHandleLogin(db))
 	http.HandleFunc("/logout", makeHandleLogout())
 	http.HandleFunc("/moderator", requireAuth(makeModeration(db)))
@@ -127,6 +128,48 @@ func makeRandompageHandler(db *sql.DB) http.HandlerFunc {
 		_, modBool := checkSession(r)
 		templ.Handler(subpage(node, modBool)).ServeHTTP(w, r)
 	}
+}
+
+// pick a random node with no parents (a LUCA) and render its children as a tree
+func makeHandleRandomVisual(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var root Node
+		for i := 0; i < 50; i++ {
+			max := countNodes(db)
+			if max <= 0 {
+				break
+			}
+			node := getnode(db, rand.Intn(max)+1)
+			if node.ID != 0 && len(node.Parents) == 0 {
+				root = node
+				break
+			}
+		}
+		if root.ID == 0 {
+			http.Error(w, "No LUCA found", http.StatusNotFound)
+			return
+		}
+
+		tree := buildSubtree(db, root, map[int]bool{})
+		templ.Handler(randomvisual(tree)).ServeHTTP(w, r)
+	}
+}
+
+// recursively expands the input node by re-fetching each child from the DB
+// doesn't shown any "upstream" nodes, only downstream
+func buildSubtree(db *sql.DB, node Node, expanded map[int]bool) Node {
+	if expanded[node.ID] {
+		return Node{ID: node.ID, Name: node.Name}
+	}
+	expanded[node.ID] = true
+
+	full := getnode(db, node.ID)
+	children := make([]Node, 0, len(full.Children))
+	for _, c := range full.Children {
+		children = append(children, buildSubtree(db, c, expanded))
+	}
+	full.Children = children
+	return full
 }
 
 // TODO: Limit the amount of search results returned, pagination?

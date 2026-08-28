@@ -29,7 +29,7 @@ func links() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"h2-row\"><h2><a href=\"/search\">Search</a></h2><h2><a href=\"/submission\">Submit</a></h2><h2><a href=\"/random\">Random</a></h2><h2><a href=\"/about\">About</a></h2></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"h2-row\"><h2><a href=\"/search\">Search</a></h2><h2><a href=\"/submission\">Submit</a></h2><h2><a href=\"/random\">Random</a></h2><h2><a href=\"/randomvisual\">Tree</a></h2><h2><a href=\"/about\">About</a></h2></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
