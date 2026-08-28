@@ -144,25 +144,34 @@ func safeSaveFile(inputfile multipart.File) (error, string) {
 		return errors.New("Error: failed to read upload"), ""
 	}
 
-	// define an anonymous function, then run as goroutine
-	// use log here since we can't return error to http
+	/* encode async so big uploads don't block the request, but write to a
+	temp name and rename atomically: the final path only ever exists as a
+	complete file, so a mod approving early can never copy a half-written
+	image. */
 	go func() {
-		createdFile, err := os.OpenFile(fileloc, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		tmp := fileloc + ".tmp"
+		createdFile, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if err != nil {
 			log.Printf("AVIF: create out: %v", err)
 			return
 		}
-		// if err, try to remove file
+		/* if err, try to remove file */
 		if err := convertToAVIF(data, createdFile); err != nil {
 			_ = createdFile.Close()
-			_ = os.Remove(fileloc)
+			_ = os.Remove(tmp)
 			log.Printf("AVIF: %v", err)
 			return
 		}
-		_ = createdFile.Close()
+		if err := createdFile.Close(); err != nil {
+			_ = os.Remove(tmp)
+			log.Printf("AVIF: close: %v", err)
+			return
+		}
+		if err := os.Rename(tmp, fileloc); err != nil {
+			_ = os.Remove(tmp)
+			log.Printf("AVIF: rename: %v", err)
+		}
 	}()
 
-	// return the fileloc, assuming the goroutine ran okay
-	// TODO: the code loading these images should be careful about referencing these files
 	return nil, fileloc
 }

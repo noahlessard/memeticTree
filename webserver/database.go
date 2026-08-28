@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -596,15 +595,15 @@ func removeSubmission(db *sql.DB, submissionNode Node) error {
 		// it was called already with ../uploads, so its fine
 	}
 
-	err := os.Remove(fileName)
-	if err != nil {
-		log.Fatal(err)
+	/* if the file is already gone, still delete the row (that's the goal anyway) */
+	if err := os.Remove(fileName); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("Error: could not remove submission image: %w", err)
 	}
 
 	query := `
 		DELETE FROM submissions WHERE id = ?
 	`
-	_, err = db.Exec(query, submissionNode.ID)
+	_, err := db.Exec(query, submissionNode.ID)
 
 	if err != nil {
 		return err
@@ -618,22 +617,18 @@ func removeSubmission(db *sql.DB, submissionNode Node) error {
 // also attempt to move the image from /uploads to /assests
 func moveSubmissionToNodes(db *sql.DB, submissionNode Node) error {
 
-	// first move image from uploads to assets
 	bytesRead, err := os.ReadFile(submissionNode.ImagePath)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Error: could not read submission image: %w", err)
 	}
 	fileName, _ := strings.CutPrefix(submissionNode.ImagePath, "../uploads/")
-	err = os.WriteFile("./assets/"+fileName, bytesRead, 0644)
-	if err != nil {
-		log.Fatal(err)
+	if err := os.WriteFile("./assets/"+fileName, bytesRead, 0644); err != nil {
+		return fmt.Errorf("Error: could not write image to assets: %w", err)
 	}
 
 	// save this under slightly different path for http handling
 	submissionNode.ImagePath = "/assets/" + fileName
 	createnode(db, submissionNode)
 
-	removeSubmission(db, submissionNode)
-
-	return nil
+	return removeSubmission(db, submissionNode)
 }

@@ -91,6 +91,11 @@ func makeEditpageHandler(db *sql.DB, submissionBool bool) authedHandler {
 		}
 
 		if r.Method == http.MethodPost {
+			if !checkSessionCSRF(r, session) {
+				http.Error(w, "Error: invalid csrf token", http.StatusForbidden)
+				return
+			}
+
 			selectedName := strings.TrimSpace(r.FormValue("name"))
 			selectedDescription := strings.TrimSpace(r.FormValue("description"))
 
@@ -114,7 +119,7 @@ func makeEditpageHandler(db *sql.DB, submissionBool bool) authedHandler {
 			return
 		}
 
-		templ.Handler(editpage(node)).ServeHTTP(w, r)
+		templ.Handler(editpage(node, session.csrf)).ServeHTTP(w, r)
 	}
 }
 
@@ -216,15 +221,13 @@ func makeHandleLogin(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 
-			// check that csrf is valid
-			c, _ := r.Cookie(csrfName)
-			if len(c.Value) <= 0 &&
-				subtle.ConstantTimeCompare([]byte(c.Value), []byte(r.FormValue("csrf"))) != 1 {
+			/* verify login-form csrf (defense in depth on top of SameSite) */
+			c, err := r.Cookie(csrfName)
+			if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(r.FormValue("csrf"))) != 1 {
 				http.Error(w, "invalid csrf token", http.StatusForbidden)
 				return
 			}
 
-			// verify login-form csrf (defense in depth on top of SameSite)
 			// check that it matches what the form said
 			name := r.FormValue("name")
 			if isMod(db, name, r.FormValue("password")) {
@@ -267,7 +270,7 @@ type authedHandler func(w http.ResponseWriter, r *http.Request, session modSessi
 func makeModeration(db *sql.DB) authedHandler {
 	return func(w http.ResponseWriter, r *http.Request, session modSession) {
 		submissions := getSubmissions(db, 0, 100)
-		templ.Handler(modpanel(db, session.user, submissions)).ServeHTTP(w, r)
+		templ.Handler(modpanel(db, session.user, session.csrf, submissions)).ServeHTTP(w, r)
 	}
 }
 
@@ -277,42 +280,33 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 		// set this to true when we submit okay
 		status := false
 
-		// this is used to name this submission
-		selectedName := strings.TrimSpace(r.FormValue("nameinput"))
-		if selectedName == "" {
-			selectedName = r.URL.Query().Get("nameinput")
-		}
-		selectedDescription := strings.TrimSpace(r.FormValue("descriptioninput"))
-		if selectedDescription == "" {
-			selectedDescription = r.URL.Query().Get("descriptioninput")
-		}
-		// can be none, parent, or child (see above consts)
-		selectedType := strings.TrimSpace(r.FormValue("searchType"))
-		if selectedType == "" {
-			selectedType = r.URL.Query().Get("searchType")
-		}
-		// this is used to enter the name of referenced node (parent / child / none)
-		selectedReference := strings.TrimSpace(r.FormValue("reference"))
-		if selectedReference == "" {
-			selectedReference = r.URL.Query().Get("reference")
-		}
-		selectedTagString := strings.TrimSpace(r.FormValue("tagsinput"))
-		if selectedTagString == "" {
-			selectedTagString = r.URL.Query().Get("tagsinput")
-		}
-
 		if r.Method == "GET" {
+			/* prefill from the query string only; GET never parses a body */
+			selectedName := strings.TrimSpace(r.URL.Query().Get("nameinput"))
+			selectedDescription := strings.TrimSpace(r.URL.Query().Get("descriptioninput"))
+			selectedType := strings.TrimSpace(r.URL.Query().Get("searchType"))
+			selectedReference := strings.TrimSpace(r.URL.Query().Get("reference"))
+			selectedTagString := strings.TrimSpace(r.URL.Query().Get("tagsinput"))
 			templ.Handler(submission(selectedName, selectedDescription, selectedTagString, selectedType, selectedReference, status)).ServeHTTP(w, r)
 			return
 		} else if r.Method == "POST" {
 
-			// bound the body before anything reads it
-			// this will return a hard error but good safety stop
+			/* bound the body before ANYTHING reads it: the first FormValue call
+			would otherwise parse the whole multipart body uncapped, spilling to /tmp */
 			r.Body = http.MaxBytesReader(w, r.Body, fileSize)
 			if err := r.ParseMultipartForm(memLimit); err != nil {
 				http.Error(w, "request too large to parse!", http.StatusBadRequest)
 				return
 			}
+
+			/* body is parsed and capped now, so these reads are safe */
+			selectedName := strings.TrimSpace(r.FormValue("nameinput"))
+			selectedDescription := strings.TrimSpace(r.FormValue("descriptioninput"))
+			/* can be none, parent, or child (see above consts) */
+			selectedType := strings.TrimSpace(r.FormValue("searchType"))
+			/* this is used to enter the name of referenced node (parent / child / none) */
+			selectedReference := strings.TrimSpace(r.FormValue("reference"))
+			selectedTagString := strings.TrimSpace(r.FormValue("tagsinput"))
 
 			// validate strings, looking up name as well to verify it matches
 			cleanTags, err := returnCleanSubmissionFields(db, selectedName, selectedTagString, selectedType)
@@ -397,7 +391,7 @@ func handleSubmission(db *sql.DB) http.HandlerFunc {
 			templ.Handler(submission("", "", "", "", "", status)).ServeHTTP(w, r)
 			return
 		} else {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			http.Error(w, "Error: method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 	}
@@ -431,6 +425,18 @@ func returnCleanSubmissionFields(db *sql.DB, name string, tags string, searchtyp
 
 func handleApproval(db *sql.DB, status bool) authedHandler {
 	return func(w http.ResponseWriter, r *http.Request, session modSession) {
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "Error: method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		/* compare against the token minted into the session at login */
+		if !checkSessionCSRF(r, session) {
+			http.Error(w, "Error: invalid csrf token", http.StatusForbidden)
+			return
+		}
+
 		selectedSubmisisonString := r.URL.Query().Get("id")
 		selectedSubmisison, _ := strconv.Atoi(selectedSubmisisonString)
 		submissionNode := getSubmission(db, selectedSubmisison)
@@ -438,11 +444,17 @@ func handleApproval(db *sql.DB, status bool) authedHandler {
 			http.Error(w, "Error: Could not find that submission to approve", http.StatusBadRequest)
 			return
 		}
+
+		var err error
 		if status == true {
-			// run database function to move submission from sub table to
-			moveSubmissionToNodes(db, submissionNode)
+			/* run database function to move submission from sub table to nodes */
+			err = moveSubmissionToNodes(db, submissionNode)
 		} else {
-			removeSubmission(db, submissionNode)
+			err = removeSubmission(db, submissionNode)
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 
 		// then recall the makeModeration function

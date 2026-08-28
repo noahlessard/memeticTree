@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -13,8 +15,14 @@ const (
 	sessionTTL  = 8 * time.Hour
 )
 
-// current sessions are stored here
-var sessions = map[string]modSession{}
+/*
+current sessions are stored here. the mutex is required since
+handlers run concurrently and a concurrent map write is fatal
+*/
+var (
+	sessions   = map[string]modSession{}
+	sessionsMu sync.Mutex
+)
 
 type modSession struct {
 	user    string
@@ -39,6 +47,8 @@ func checkSession(r *http.Request) (modSession, bool) {
 	if err != nil {
 		return modSession{}, false
 	}
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
 	// check that the time hasn't expired
 	session, ok := sessions[cookie.Value]
 	if !ok || time.Now().After(session.expires) {
@@ -60,7 +70,9 @@ func setSession(w http.ResponseWriter, r *http.Request, s modSession) error {
 	if err != nil {
 		return err
 	}
+	sessionsMu.Lock()
 	sessions[sessionKey] = s
+	sessionsMu.Unlock()
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionName,
 		Value:    sessionKey,
@@ -77,7 +89,9 @@ func setSession(w http.ResponseWriter, r *http.Request, s modSession) error {
 // also clear the cookie
 func clearSession(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionName); err == nil {
+		sessionsMu.Lock()
 		delete(sessions, c.Value)
+		sessionsMu.Unlock()
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionName,
@@ -88,6 +102,12 @@ func clearSession(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   -1,
 	})
+}
+
+/* validates a submitted csrf form field against the token minted into the session at login. */
+func checkSessionCSRF(r *http.Request, session modSession) bool {
+	token := r.FormValue("csrf")
+	return subtle.ConstantTimeCompare([]byte(session.csrf), []byte(token)) == 1
 }
 
 // returns the form csrf token, minting and cookie-storing one if

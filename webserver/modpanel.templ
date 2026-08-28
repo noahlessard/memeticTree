@@ -4,7 +4,7 @@ import "strings"
 import "fmt"
 import "database/sql"
 
-templ modpanel(db *sql.DB, user string, submissions []Node) {
+templ modpanel(db *sql.DB, user string, csrf string, submissions []Node) {
 
 <!DOCTYPE html>
 <html>
@@ -89,9 +89,19 @@ templ modpanel(db *sql.DB, user string, submissions []Node) {
             }
             
             <td>{ tags }</td>
-            <td><a href={ "/approve?id=" + fmt.Sprint(sub.ID)}>Approve</a></td>
+            <td>
+                <form method="POST" action={ "/approve?id=" + fmt.Sprint(sub.ID) }>
+                    <input type="hidden" name="csrf" value={ csrf }>
+                    <button type="submit">Approve</button>
+                </form>
+            </td>
             <td><a href={ "/editsubmission?id=" + fmt.Sprint(sub.ID)}>Edit</a></td>
-            <td><a href={ "/reject?id=" + fmt.Sprint(sub.ID)}>Reject</a></td>
+            <td>
+                <form method="POST" action={ "/reject?id=" + fmt.Sprint(sub.ID) }>
+                    <input type="hidden" name="csrf" value={ csrf }>
+                    <button type="submit">Reject</button>
+                </form>
+            </td>
 
         </tr>
     }
