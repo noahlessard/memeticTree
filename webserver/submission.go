@@ -144,10 +144,10 @@ func safeSaveFile(inputfile multipart.File) (error, string) {
 		return errors.New("Error: failed to read upload"), ""
 	}
 
-	/* encode async so big uploads don't block the request, but write to a
-	temp name and rename atomically: the final path only ever exists as a
-	complete file, so a mod approving early can never copy a half-written
-	image. */
+	/* encode async so big uploads don't block the request. write to a temp
+	name and rename atomically: the final path only ever exists as a complete
+	file. the mod panel checks imageReady before emitting this URL, so nobody
+	can see (or get a cached 404 for) a half-written image. */
 	go func() {
 		tmp := fileloc + ".tmp"
 		createdFile, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -174,4 +174,9 @@ func safeSaveFile(inputfile multipart.File) (error, string) {
 	}()
 
 	return nil, fileloc
+}
+
+func imageReady(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

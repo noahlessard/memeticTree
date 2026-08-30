@@ -447,6 +447,11 @@ func handleApproval(db *sql.DB, status bool) authedHandler {
 
 		var err error
 		if status == true {
+			/* the image is written async, so the final path may not exist yet */
+			if !imageReady(submissionNode.ImagePath) {
+				http.Error(w, "Error: image still processing, try again in a moment", http.StatusConflict)
+				return
+			}
 			/* run database function to move submission from sub table to nodes */
 			err = moveSubmissionToNodes(db, submissionNode)
 		} else {

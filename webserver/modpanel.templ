@@ -72,7 +72,12 @@ templ modpanel(db *sql.DB, user string, csrf string, submissions []Node) {
                 {{ tags = strings.Join(sub.Tags, ", ") }}
             }
             
+            /* only link image it once it's ready. */
+            if imageReady(sub.ImagePath) {
             <td><img src={ sub.ImagePath } alt="Error! No image" height="200"></td>
+            } else {
+            <td>Image processing...</td>
+            }
             <td>{ name }</td>
             <td>{ desc }</td>
         

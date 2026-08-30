@@ -22,7 +22,12 @@ templ editpage(node Node, csrf string) {
     @offspring(node.Name, "Memetic Ancestors", node.Parents)
 
     <div class="center-image-text">
+        /* submissions can be edited before their async image encode finishes */
+        if imageReady(node.ImagePath) {
         <img src={ node.ImagePath } class="tree-img">
+        } else {
+        <p>Image still processing…</p>
+        }
 
         <div>
          <form method="POST">
