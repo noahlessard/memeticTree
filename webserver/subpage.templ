@@ -35,6 +35,7 @@ templ subpage(node Node, modBool bool) {
     if modBool {
         <a href={"/editpage?id=" + fmt.Sprint(node.ID)}>Edit this node</a><br>
     }
+    <a href={"/tree?id=" + fmt.Sprint(node.ID)}>View in a tree</a>
 
     <div class="border">
 

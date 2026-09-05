@@ -44,7 +44,7 @@ func startWebserver(db *sql.DB) {
 	http.HandleFunc("/submission", handleSubmission(db))
 	http.HandleFunc("/search", makeHandleSearch(db))
 	http.HandleFunc("/random", makeRandompageHandler(db))
-	http.HandleFunc("/randomvisual", makeHandleRandomVisual(db))
+	http.HandleFunc("/tree", makeHandleVisual(db))
 	http.HandleFunc("/login", makeHandleLogin(db))
 	http.HandleFunc("/logout", makeHandleLogout())
 	http.HandleFunc("/moderator", requireAuth(makeModeration(db)))
@@ -136,20 +136,34 @@ func makeRandompageHandler(db *sql.DB) http.HandlerFunc {
 }
 
 // pick a random node with no parents (a LUCA) and render its children as a tree
-func makeHandleRandomVisual(db *sql.DB) http.HandlerFunc {
+func makeHandleVisual(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var root Node
-		for i := 0; i < 50; i++ {
-			max := countNodes(db)
-			if max <= 0 {
-				break
+
+		id := strings.TrimSpace(r.URL.Query().Get("id"))
+		// empty, so get random LUCA for visual
+		if id == "" {
+			for i := 0; i < 50; i++ {
+				max := countNodes(db)
+				if max <= 0 {
+					break
+				}
+				node := getnode(db, rand.Intn(max)+1)
+				if node.ID != 0 && len(node.Parents) == 0 {
+					root = node
+					break
+				}
 			}
-			node := getnode(db, rand.Intn(max)+1)
-			if node.ID != 0 && len(node.Parents) == 0 {
-				root = node
-				break
+			// a node was given, so convert and fetch
+		} else {
+			idInt, err := strconv.Atoi(id)
+			if err != nil {
+				http.Error(w, "Error: could not process node ID", http.StatusBadRequest)
+				return
 			}
+			root = getnode(db, idInt)
 		}
+
 		if root.ID == 0 {
 			http.Error(w, "No LUCA found", http.StatusNotFound)
 			return
